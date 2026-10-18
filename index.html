@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f8fa">
+<title>タイムバケット</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 参考図どおり、年代ごとのバケツを1本の年齢軸の上に横並びにし、軸の下に目盛りと「青年期・中年期・高齢期」の札を置く */
+:root{
+  --bg:#f7f8fa; --surface:#ffffff; --surface-2:#f0f2f5; --line:#d4d9e0;
+  --ink:#1c1f24; --ink-2:#555c66; --ink-3:#8a919b;
+  --axis:#1c1f24;
+  --title-bg:#c4d7e6; --title-line:#2b3440;
+  --pill-line:#3aa6b9;
+  --young:#bcd9ef; --young-rim:#a8cde9; --young-2:#cfe4f4; --young-2-rim:#b9d7ee;
+  --mid:#f9d9b8; --mid-rim:#f3c79c; --mid-2:#f1b27c; --mid-2-rim:#eba068;
+  --old:#a6d39b; --old-rim:#8fc583; --old-2:#bfe0b6; --old-2-rim:#a8d59d;
+  --out:#dfe2e6; --out-rim:#cdd1d6;
+  --pail-ink:#1c1f24;
+  --now:#d94b3d; --check:#1f7a52;
+  --accent:#2b6f9e; --accent-ink:#ffffff;
+  --danger:#b3372f; --danger-soft:#f6dedb;
+  --shadow:0 2px 10px rgba(28,31,36,.08);
+  --f-body:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
+  --col:176px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14171c; --surface:#1c2027; --surface-2:#252a33; --line:#343b46;
+  --ink:#eceff3; --ink-2:#aeb5c0; --ink-3:#7c8592;
+  --axis:#d9dde3;
+  --title-bg:#2a3d4d; --title-line:#9fb4c6;
+  --pill-line:#4fb9cb;
+  --young:#2b4a64; --young-rim:#355a79; --young-2:#24405a; --young-2-rim:#2f506d;
+  --mid:#6a4a2c; --mid-rim:#7c5733; --mid-2:#7d4f24; --mid-2-rim:#915d2b;
+  --old:#365c33; --old-rim:#416d3d; --old-2:#2d4f2b; --old-2-rim:#386135;
+  --out:#33383f; --out-rim:#3d434b;
+  --pail-ink:#f1f3f6;
+  --now:#ff7b6e; --check:#6fd3a0;
+  --accent:#6fb3e3; --accent-ink:#0f1a24;
+  --danger:#ec7a70; --danger-soft:#3c1f1d;
+  --shadow:0 2px 10px rgba(0,0,0,.35);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14171c; --surface:#1c2027; --surface-2:#252a33; --line:#343b46;
+  --ink:#eceff3; --ink-2:#aeb5c0; --ink-3:#7c8592;
+  --axis:#d9dde3;
+  --title-bg:#2a3d4d; --title-line:#9fb4c6;
+  --pill-line:#4fb9cb;
+  --young:#2b4a64; --young-rim:#355a79; --young-2:#24405a; --young-2-rim:#2f506d;
+  --mid:#6a4a2c; --mid-rim:#7c5733; --mid-2:#7d4f24; --mid-2-rim:#915d2b;
+  --old:#365c33; --old-rim:#416d3d; --old-2:#2d4f2b; --old-2-rim:#386135;
+  --out:#33383f; --out-rim:#3d434b;
+  --pail-ink:#f1f3f6;
+  --now:#ff7b6e; --check:#6fd3a0;
+  --accent:#6fb3e3; --accent-ink:#0f1a24;
+  --danger:#ec7a70; --danger-soft:#3c1f1d;
+  --shadow:0 2px 10px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+.acct{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.acct .sync{margin-left:0}
+.login{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700}
+.login svg{width:16px;height:16px}
+.who{font-size:12px;color:var(--ink-2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.linkbtn{border:0;background:none;color:var(--accent);font-size:12px;padding:2px 4px;text-decoration:underline}
+.privacy{font-size:12px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.keybox{font-family:var(--f-mono);font-size:clamp(15px,4.2vw,20px);font-weight:600;letter-spacing:.04em;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;word-break:break-all;user-select:all}
+.note{font-size:13px;color:var(--ink-2);margin:0}
+.warn{font-size:13px;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:8px 10px;margin:0}
+.copyrow{display:flex;flex-wrap:wrap;gap:8px}
+.or{display:flex;align-items:center;gap:10px;color:var(--ink-3);font-size:12px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.danger-zone{width:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:12px}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;font-weight:500}
+.wrap{max-width:1240px;margin:0 auto;padding-block:20px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* header like the reference: pill title + explanation */
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px}
+.title-box{background:var(--title-bg);border:1.5px solid var(--title-line);border-radius:14px;padding:10px 40px}
+.title-box h1{margin:0;font-size:clamp(22px,4vw,30px);font-weight:900;letter-spacing:.12em;line-height:1.2}
+.lead{flex:1 1 280px;margin:0;font-size:clamp(14px,2vw,17px);font-weight:700;max-width:40ch;text-wrap:pretty}
+.sync{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.sync[data-s="ok"] i{background:var(--check)}
+.sync[data-s="saving"] i{background:#e0a030}
+.sync[data-s="err"] i{background:var(--danger)}
+
+.stats{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--ink-2)}
+.stats b{font-family:var(--f-mono);font-size:18px;color:var(--ink);font-weight:600;margin-right:3px}
+
+/* settings */
+details.settings{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+details.settings summary{cursor:pointer;padding:10px 16px;font-weight:700;font-size:14px;list-style:none;display:flex;justify-content:space-between;gap:8px}
+details.settings summary::-webkit-details-marker{display:none}
+details.settings summary span{color:var(--ink-2);font-weight:500;font-size:13px}
+.set-body{padding:4px 16px 16px;display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12px;letter-spacing:.06em;color:var(--ink-2);font-weight:700}
+.field input,.field select{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+.field.small{width:100px}
+.span-field{flex:1 1 300px}
+.span-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.span-row input{width:72px}
+.chip-btn{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:5px 12px;font-size:13px}
+.chip-btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.toggles{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--ink-2)}
+.toggles label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+
+/* board */
+.board{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 0 14px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.board-head{display:flex;justify-content:center;padding:0 16px}
+.sub-pill{border:1.5px solid var(--pill-line);border-radius:10px;padding:6px 28px;font-weight:700;font-size:clamp(15px,2.4vw,19px);letter-spacing:.06em;background:var(--surface)}
+.scroller{overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;padding:0 16px 6px;scroll-padding-inline:16px}
+.track{display:flex;align-items:flex-end;width:max-content;min-width:100%}
+.group{display:flex;flex-direction:column;align-items:stretch}
+.cols{display:flex;align-items:flex-end;border-bottom:6px solid var(--axis);padding:0 10px}
+.ticks{display:flex;padding:0 10px}
+.stage-row{display:flex;justify-content:center;padding-top:6px}
+.stage{border:1.5px solid var(--axis);background:var(--surface);padding:2px 18px;font-weight:700;font-size:15px;letter-spacing:.08em}
+.col{width:var(--col);flex:none;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 8px;position:relative}
+.age-lab{font-weight:900;font-size:21px;letter-spacing:.02em;white-space:nowrap;line-height:1.2}
+.age-lab .yr{display:block;text-align:center;font-family:var(--f-mono);font-size:11px;font-weight:500;color:var(--ink-3);letter-spacing:0}
+.now-pill{position:absolute;top:-24px;font-size:11px;font-weight:700;color:var(--now);border:1.5px solid var(--now);border-radius:999px;padding:0 8px;background:var(--surface);white-space:nowrap}
+.col.has-now{margin-top:24px}
+
+/* the pail */
+.pail{width:100%;display:flex;flex-direction:column;align-items:stretch;color:var(--pail-ink)}
+.rim{height:14px;margin:0 -5px;border-radius:7px 7px 3px 3px;background:var(--rim)}
+.pbody{background:var(--fill);clip-path:polygon(0 0,100% 0,93% 100%,7% 100%);padding:10px 16px 12px;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center}
+.col.now .rim{box-shadow:0 0 0 2px var(--now)}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;width:100%}
+.pit{display:flex;align-items:flex-start;justify-content:center;gap:3px}
+.pit .ck{flex:none;width:18px;height:18px;margin-top:2px;border-radius:50%;border:1.5px solid currentColor;background:transparent;opacity:.45;padding:0;font-size:11px;line-height:15px;color:inherit}
+.pit .ck[aria-pressed="true"]{opacity:1;background:var(--check);border-color:var(--check);color:#fff}
+.pit .tx{border:0;background:none;padding:0 2px;font-weight:700;font-size:14.5px;line-height:1.45;color:inherit;overflow-wrap:anywhere;text-align:center;min-width:0}
+.pit .tx small{display:block;font-family:var(--f-mono);font-weight:500;font-size:10.5px;opacity:.7}
+.pit.done .tx{text-decoration:line-through;opacity:.55}
+.pempty{font-size:12.5px;opacity:.6}
+.padd{margin-top:6px;border:1.5px dashed currentColor;opacity:.55;background:none;border-radius:999px;padding:1px 12px;font-size:12px;color:inherit}
+.padd:hover{opacity:1}
+.pmeta{font-size:11px;opacity:.75;font-family:var(--f-mono)}
+.col.past .pail{opacity:.55}
+
+.brk{width:22px;flex:none;position:relative;align-self:stretch}
+.cols .brk::after{content:"//";position:absolute;bottom:-17px;left:50%;transform:translateX(-50%);font-weight:900;font-size:20px;color:var(--axis);background:var(--surface);line-height:1;padding:0 1px;letter-spacing:-3px}
+.tick{width:var(--col);flex:none;display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:13px;color:var(--ink-2);padding-top:2px}
+.tick span{transform:translateX(-50%)}
+.tick span.r{transform:translateX(50%)}
+
+.welcome{border:1px dashed var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:0 16px}
+.welcome p{margin:0;max-width:62ch;color:var(--ink-2);font-size:14px}
+.hint{font-size:12px;color:var(--ink-3);padding:0 16px}
+.btn{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:8px 14px;font-size:14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.danger{color:var(--danger);border-color:var(--danger-soft);background:var(--danger-soft)}
+.btn.ghost{background:none}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(10,14,20,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+@media (min-width:640px){.overlay{align-items:center}}
+.sheet{background:var(--surface);color:var(--ink);width:100%;max-width:520px;border-radius:14px 14px 0 0;padding:18px 18px 20px;display:flex;flex-direction:column;gap:12px;max-height:92%;overflow:auto;box-shadow:var(--shadow)}
+@media (min-width:640px){.sheet{border-radius:14px}}
+.sheet h2{margin:0;font-weight:900;font-size:20px}
+.sheet .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sheet textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-height:70px;resize:vertical}
+.sheet .actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:4px}
+.sheet .actions div{display:flex;gap:8px}
+.confirm-del{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--danger)}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px;z-index:30}
+footer{font-size:12px;color:var(--ink-3);display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between}
+@media (max-width:520px){:root{--col:150px}.field.small{width:calc(50% - 10px)}.age-lab{font-size:18px}.title-box{padding:8px 26px}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ===== Firebase の設定 =====
+   Firebase コンソール > プロジェクトの設定 > マイアプリ(ウェブ)に表示される firebaseConfig を
+   下にそのまま貼り付けてください。この値は公開しても問題ない識別子です(秘密鍵ではありません)。 */
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDw_x7nsVGR1yWYtXxBTmOHv5CFRqcDJWU",
+  authDomain: "timebucket-207d4.firebaseapp.com",
+  projectId: "timebucket-207d4",
+  storageBucket: "timebucket-207d4.firebasestorage.app",
+  messagingSenderId: "101966198709",
+  appId: "1:101966198709:web:ad437fd2cdf5d4e5d1cbfc"
+};
+</script>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div class="title-box"><h1>タイムバケット</h1></div>
+    <p class="lead">自分の年齢・年代をバケツに見立て、各年代ごとに自分のしたいことを記載したもの</p>
+    <div class="acct">
+      <span class="sync" id="sync" data-s="local"><i></i><span id="syncText">読み込み中…</span></span>
+      <button type="button" class="login" id="syncBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span id="syncBtnText">PC・スマホで同期</span></button>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <details class="settings" id="setBox">
+    <summary>設定(生まれ年・年齢の範囲・バケットの年数)<span id="setSummary"></span></summary>
+    <div class="set-body">
+      <div class="field small"><label for="birthYear">生まれ年</label><input id="birthYear" type="number" inputmode="numeric" placeholder="例 1985" min="1900" max="2100"></div>
+      <div class="field small"><label for="startAge">開始年齢</label><input id="startAge" type="number" inputmode="numeric" min="0" max="120"></div>
+      <div class="field small"><label for="endAge">終了年齢</label><input id="endAge" type="number" inputmode="numeric" min="1" max="130"></div>
+      <div class="field span-field">
+        <label for="spanYears">バケットの年数(1つのバケツ)</label>
+        <div class="span-row" id="spanRow">
+          <button type="button" class="chip-btn" data-span="1">1年</button>
+          <button type="button" class="chip-btn" data-span="3">3年</button>
+          <button type="button" class="chip-btn" data-span="5">5年</button>
+          <button type="button" class="chip-btn" data-span="10">10年</button>
+          <input id="spanYears" type="number" inputmode="numeric" min="1" max="50" aria-label="バケットの年数(任意)"><span style="font-size:13px;color:var(--ink-2)">年ごと</span>
+        </div>
+      </div>
+      <div class="field small"><label for="youngEnd">中年期の始まり</label><input id="youngEnd" type="number" inputmode="numeric" min="1" max="120"></div>
+      <div class="field small"><label for="oldStart">高齢期の始まり</label><input id="oldStart" type="number" inputmode="numeric" min="1" max="130"></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="skipEmpty"> 空のバケツを省略</label>
+        <label><input type="checkbox" id="showDone" checked> 完了も表示</label>
+        <label><input type="checkbox" id="hidePast"> 過ぎた年代を隠す</label>
+      </div>
+      <div class="danger-zone" id="dangerZone" hidden><span>クラウドに保存した暗号化データ:</span><span id="delAllArea"><button type="button" class="btn danger" id="delAllBtn">クラウドから削除して同期をやめる</button></span></div>
+    </div>
+  </details>
+
+  <section class="board" aria-label="タイムバケット">
+    <div class="board-head"><div class="sub-pill">わたしのタイムバケット</div></div>
+    <div id="welcome"></div>
+    <div class="scroller" id="scroller"><div class="track" id="track"></div></div>
+    <div class="hint">バケツの中の文字をタップすると編集、○で完了。横にスクロールできます。</div>
+  </section>
+
+  <div class="privacy" id="privacyNote">ログインもメールアドレスも不要です。「PC・スマホで同期」で作られる<b>同期キー</b>を自分の端末どうしで共有すると、同じ内容が表示されます。データはこの端末の中で同期キーを使って暗号化してから送るため、運営者を含めて同期キーを持たない人には中身が読めません。同期キーをなくすと誰にも復元できないので、控えておいてください。</div>
+
+  <footer>
+    <span>タイムバケット</span>
+    <span id="footNote"></span>
+  </footer>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+(function(){
+const CATS=[
+  {id:"travel",name:"旅行"},{id:"family",name:"家族・友人"},{id:"learn",name:"学び・資格"},
+  {id:"health",name:"健康・体験"},{id:"work",name:"仕事・お金"},{id:"hobby",name:"趣味"},{id:"other",name:"その他"}
+];
+const catOf=id=>CATS.find(c=>c.id===id)||CATS[6];
+const LS_KEY="timebucket.v1";
+const THIS_YEAR=new Date().getFullYear();
+const STAGES={young:{name:"青年期",v:["young","young-2"]},mid:{name:"中年期",v:["mid","mid-2"]},old:{name:"高齢期",v:["old","old-2"]},out:{name:"範囲外",v:["out","out"]}};
+
+let state={v:1,settings:{birthYear:null,startAge:20,endAge:90,span:5,midAge:40,oldAge:65},items:[]};
+let docRef=null, lastSaved="", saving=false, dirty=false, saveTimer=null, readOnly=false, modalOpen=false, pendingRemote=null, didScroll=false;
+const prefs=loadPrefs();
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const clampInt=(v,lo,hi,d)=>{v=parseInt(v,10);return isNaN(v)?d:Math.min(hi,Math.max(lo,v));};
+
+function loadPrefs(){try{return JSON.parse(localStorage.getItem("timebucket.prefs")||"{}")}catch(e){return {}}}
+function savePrefs(){try{localStorage.setItem("timebucket.prefs",JSON.stringify(prefs))}catch(e){}}
+function loadLocal(){try{const j=localStorage.getItem(LS_KEY);return j?JSON.parse(j):null}catch(e){return null}}
+function saveLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify(state))}catch(e){}}
+
+function normalize(d){
+  const s=(d&&d.settings)||{};
+  const st={
+    birthYear:s.birthYear?clampInt(s.birthYear,1900,2100,null):null,
+    startAge:clampInt(s.startAge,0,120,20),
+    endAge:clampInt(s.endAge,1,130,90),
+    span:clampInt(s.span,1,50,5),
+    midAge:clampInt(s.midAge,1,120,40),
+    oldAge:clampInt(s.oldAge,1,130,65)
+  };
+  if(st.endAge<=st.startAge) st.endAge=st.startAge+st.span;
+  if(st.oldAge<=st.midAge) st.oldAge=st.midAge+1;
+  const items=Array.isArray(d&&d.items)?d.items.filter(x=>x&&x.id&&x.title).map(x=>({
+    id:String(x.id),title:String(x.title).slice(0,200),age:clampInt(x.age,0,130,st.startAge),
+    cat:catOf(x.cat).id,cost:x.cost===""||x.cost==null||isNaN(+x.cost)?null:+x.cost,
+    done:!!x.done,memo:String(x.memo||"").slice(0,2000),sample:!!x.sample,created:+x.created||0
+  })):[];
+  return {v:1,settings:st,items};
+}
+
+/* ---------- sync (Firebase + 端末内暗号化) ----------
+   ・同期キー(120bitの乱数)はこの端末の中だけで扱い、サーバーには送らない。
+   ・同期キーから HKDF で「文書ID」と「AES-GCM 鍵」を作る。サーバーには文書IDと暗号文だけが保存される。
+   ・Firebase へは匿名ログインのみ(メールアドレス等は不要)。 */
+let auth=null, fdb=null, unsub=null, vault=null, syncKey=null, lastCt="", flushChain=Promise.resolve();
+const KEY_LS="timebucket.synckey";
+const ALPH="0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const DEFAULT_STATE=()=>({v:1,settings:{birthYear:null,startAge:20,endAge:90,span:5,midAge:40,oldAge:65},items:[]});
+const te=new TextEncoder(), td=new TextDecoder();
+
+function newKey(){const r=crypto.getRandomValues(new Uint8Array(24));let k="";r.forEach(b=>k+=ALPH[b&31]);return k;}
+function fmtKey(k){return k.match(/.{1,4}/g).join("-");}
+function parseKey(str){
+  let k=String(str||"").toUpperCase().replace(/[^0-9A-Z]/g,"").replace(/O/g,"0").replace(/[IL]/g,"1").replace(/U/g,"V");
+  return k.length===24&&[...k].every(c=>ALPH.includes(c))?k:null;
+}
+function b64(buf){const u=new Uint8Array(buf);let s="";for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);}
+function unb64(str){const s=atob(str);const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
+async function deriveVault(k){
+  const ikm=await crypto.subtle.importKey("raw",te.encode("TB1:"+k),"HKDF",false,["deriveBits","deriveKey"]);
+  const salt=te.encode("timebucket-v1");
+  const idBits=await crypto.subtle.deriveBits({name:"HKDF",hash:"SHA-256",salt,info:te.encode("doc-id")},ikm,256);
+  const aes=await crypto.subtle.deriveKey({name:"HKDF",hash:"SHA-256",salt,info:te.encode("aes-gcm")},ikm,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+  return {id:[...new Uint8Array(idBits)].map(b=>b.toString(16).padStart(2,"0")).join(""),aes};
+}
+async function encryptState(st){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},vault.aes,te.encode(JSON.stringify(st)));
+  return {v:2,iv:b64(iv),ct:b64(ct)};
+}
+async function decryptDoc(d){
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(d.iv)},vault.aes,unb64(d.ct));
+  return normalize(JSON.parse(td.decode(pt)));
+}
+
+function setSync(s,text){$("sync").dataset.s=s;$("syncText").textContent=text;}
+function changed(){
+  saveLocal();render();
+  if(!docRef)return;
+  dirty=true;setSync("saving","保存中…");
+  clearTimeout(saveTimer);saveTimer=setTimeout(flush,700);
+}
+function flush(){flushChain=flushChain.then(doFlush).catch(()=>{});return flushChain;}
+async function doFlush(){
+  if(!docRef||!dirty)return;
+  dirty=false;
+  const ref=docRef, body=await encryptState(state);
+  if(ref!==docRef)return;
+  lastCt=body.ct;
+  if(!navigator.onLine)setSync("saving","オフライン(つながると送信)");
+  ref.set(body).then(()=>{if(ref===docRef&&!dirty)setSync("ok","同期済み(暗号化)");}).catch(e=>{
+    if(ref!==docRef)return;
+    dirty=true;
+    setSync("err",e&&e.code==="permission-denied"?"保存が拒否されました":"保存できませんでした。通信を確認してください");
+  });
+}
+function applyRemote(d){state=d;saveLocal();render();}
+function clearLocal(){try{localStorage.removeItem(LS_KEY)}catch(e){}}
+function storeKey(k){try{k?localStorage.setItem(KEY_LS,k):localStorage.removeItem(KEY_LS)}catch(e){}}
+function storedKey(){try{return localStorage.getItem(KEY_LS)}catch(e){return null}}
+
+function showSyncUI(){
+  $("syncBtn").hidden=!fdb;
+  $("syncBtnText").textContent=syncKey?"同期キー":"PC・スマホで同期";
+  $("dangerZone").hidden=!syncKey;
+  $("footNote").textContent=syncKey?"暗号化して同期中":(fdb?"この端末にのみ保存中":"同期の設定がまだです(Firebase未設定)");
+}
+function ensureAuth(){
+  return new Promise((res,rej)=>{
+    const off=auth.onAuthStateChanged(u=>{off();if(u)res(u);else auth.signInAnonymously().then(c=>res(c.user)).catch(rej);});
+  });
+}
+
+/* mode: "create" 新しいキーで始める / "join" 既存キーにつなぐ / "resume" 保存済みキーで再開 */
+async function connect(k,mode){
+  await ensureAuth();
+  const v=await deriveVault(k);
+  const ref=fdb.collection("vaults").doc(v.id);
+  const snap=await ref.get();
+  vault=v;
+  if(mode==="create"){
+    if(snap.exists)throw new Error("collision");
+  }else{
+    if(!snap.exists){vault=null;throw new Error(mode==="resume"?"gone":"notfound");}
+    let remote;
+    try{remote=await decryptDoc(snap.data());}catch(e){vault=null;throw new Error("decrypt");}
+    const ids=new Set(remote.items.map(i=>i.id));
+    const extra=mode==="join"?state.items.filter(i=>!ids.has(i.id)&&!i.sample):[];
+    state=remote;
+    if(extra.length){state.items=state.items.concat(extra);toast(`この端末の${extra.length}件を追加しました`);}
+    lastCt=extra.length?"":snap.data().ct;
+  }
+  syncKey=k;storeKey(k);docRef=ref;showSyncUI();saveLocal();render();
+  if(lastCt===""){dirty=true;flush();}
+  else setSync("ok","同期済み(暗号化)");
+  subscribe();
+}
+function subscribe(){
+  if(unsub)unsub();
+  const ref=docRef;
+  unsub=ref.onSnapshot(async snap=>{
+    if(ref!==docRef||snap.metadata.hasPendingWrites)return;
+    if(!snap.exists){
+      unlink(false);toast("同期データが削除されたため、この端末の同期を解除しました");return;
+    }
+    const d=snap.data();
+    if(d.ct===lastCt){if(!dirty)setSync("ok","同期済み(暗号化)");return;}
+    if(dirty)return;
+    let remote;
+    try{remote=await decryptDoc(d);}catch(e){setSync("err","データを復号できません(同期キー違い)");return;}
+    if(ref!==docRef||dirty)return;
+    lastCt=d.ct;
+    if(modalOpen){pendingRemote=remote;return;}
+    applyRemote(remote);setSync("ok","同期済み(暗号化)");
+  },e=>setSync("err","同期が止まりました。再読み込みしてください"));
+}
+function unlink(clearData){
+  if(unsub){unsub();unsub=null;}
+  docRef=null;vault=null;syncKey=null;lastCt="";dirty=false;clearTimeout(saveTimer);
+  storeKey(null);
+  if(clearData){state=DEFAULT_STATE();clearLocal();render();}
+  setSync("local","この端末にのみ保存");showSyncUI();
+}
+
+function initSync(){
+  const cfg=window.FIREBASE_CONFIG||{};
+  if(!window.firebase||!window.crypto||!crypto.subtle||!cfg.apiKey||/ここに/.test(cfg.apiKey)){
+    setSync("local","この端末にのみ保存");showSyncUI();return;
+  }
+  try{firebase.initializeApp(cfg);auth=firebase.auth();fdb=firebase.firestore();}
+  catch(e){setSync("err","同期の設定を読み込めませんでした");return;}
+  setSync("local","この端末にのみ保存");showSyncUI();
+  window.addEventListener("online",()=>{if(docRef)setSync(dirty?"saving":"ok",dirty?"保存中…":"同期済み(暗号化)");});
+  window.addEventListener("offline",()=>{if(docRef)setSync("saving","オフライン(つながると送信)");});
+  const hashKey=(location.hash.match(/^#k=([0-9A-Za-z-]+)$/)||[])[1];
+  if(hashKey)history.replaceState(null,"",location.pathname+location.search);
+  const k=storedKey();
+  const afterResume=()=>{const hk=parseKey(hashKey);if(hk&&hk!==syncKey)openSyncSheet(hk);};
+  if(k&&parseKey(k)){
+    setSync("saving","同期中…");
+    connect(k,"resume").then(afterResume).catch(e=>{
+      if(e.message==="gone"){unlink(false);toast("同期データが見つからないため、同期を解除しました");}
+      else{setSync("err","同期できませんでした。再読み込みしてください");}
+      afterResume();
+    });
+  }else afterResume();
+}
+
+/* ---------- 同期キーの画面 ---------- */
+function copyText(text,btn){
+  const done=()=>{const o=btn.textContent;btn.textContent="コピーしました";setTimeout(()=>btn.textContent=o,1500);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(done).catch(()=>prompt("コピーしてください",text));
+  else prompt("コピーしてください",text);
+}
+function shareLink(k){return location.origin+location.pathname+"#k="+fmtKey(k);}
+function openSyncSheet(prefill){
+  modalOpen=true;
+  const close=()=>{document.removeEventListener("keydown",onKey);$("modalRoot").innerHTML="";modalOpen=false;if(pendingRemote&&!dirty)applyRemote(pendingRemote);pendingRemote=null;};
+  const onKey=e=>{if(e.key==="Escape")close();};
+  document.addEventListener("keydown",onKey);
+  if(syncKey&&!prefill){
+    $("modalRoot").innerHTML=`<div class="overlay" id="ov"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="skT">
+      <h2 id="skT">同期キー</h2>
+      <p class="note">ほかの端末(スマホなど)で、このキーを入力するか、下のリンクを開くと同じ内容が表示されます。</p>
+      <div class="keybox" id="keyText">${fmtKey(syncKey)}</div>
+      <div class="copyrow"><button type="button" class="btn" id="cpKey">キーをコピー</button><button type="button" class="btn" id="cpLink">同期用リンクをコピー</button></div>
+      <p class="warn">このキーを持つ人は誰でも内容を読み書きできます。自分の端末以外には渡さないでください。なくすと誰にも復元できないので、メモ帳などに控えておいてください。</p>
+      <div class="actions"><div id="unlinkArea"><button type="button" class="btn ghost" id="unlinkBtn">この端末の同期を解除</button></div><div><button type="button" class="btn primary" id="closeBtn">閉じる</button></div></div>
+    </div></div>`;
+    $("cpKey").onclick=e=>copyText(fmtKey(syncKey),e.currentTarget);
+    $("cpLink").onclick=e=>copyText(shareLink(syncKey),e.currentTarget);
+    $("unlinkBtn").onclick=()=>{
+      $("unlinkArea").innerHTML=`<span class="confirm-del">この端末から内容を消して同期を解除します(クラウドと他の端末には残ります)。 <button type="button" class="btn danger" id="unYes">解除する</button></span>`;
+      $("unYes").onclick=()=>{unlink(true);close();toast("この端末の同期を解除しました");};
+    };
+  }else{
+    $("modalRoot").innerHTML=`<div class="overlay" id="ov"><form class="sheet" id="joinForm" role="dialog" aria-modal="true" aria-labelledby="skT">
+      <h2 id="skT">PC・スマホで同期する</h2>
+      <p class="note">ログインは不要です。最初の端末で同期キーを作り、ほかの端末でそのキーを入力します。内容は端末の中で暗号化され、運営者にも読めません。</p>
+      ${prefill?"":`<button type="button" class="btn primary" id="createBtn">新しく同期キーを作る(この端末の内容を保存)</button><div class="or">または</div>`}
+      <div class="field"><label for="joinKey">ほかの端末で作った同期キー</label><input id="joinKey" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" value="${prefill?fmtKey(prefill):""}"></div>
+      ${prefill&&syncKey?`<p class="warn">この端末は別の同期キーで同期中です。切り替えると、この端末の表示はリンクのキーの内容になります。</p>`:""}
+      <p class="note" id="joinMsg" role="status"></p>
+      <div class="actions"><div></div><div><button type="button" class="btn ghost" id="closeBtn">キャンセル</button><button type="submit" class="btn primary" id="joinBtn">このキーで同期</button></div></div>
+    </form></div>`;
+    const cb=$("createBtn");
+    if(cb)cb.onclick=async()=>{
+      cb.disabled=true;$("joinMsg").textContent="作成中…";
+      try{const k=newKey();await connect(k,"create");close();openSyncSheet();toast("同期キーを作りました");}
+      catch(e){cb.disabled=false;$("joinMsg").textContent="作成できませんでした。通信を確認してもう一度お試しください。";}
+    };
+    $("joinForm").addEventListener("submit",async e=>{
+      e.preventDefault();
+      const k=parseKey($("joinKey").value);
+      if(!k){$("joinMsg").textContent="同期キーは英数字24文字です(ハイフンは省略可)。";return;}
+      $("joinBtn").disabled=true;$("joinMsg").textContent="接続中…";
+      const prev=syncKey;
+      if(prev)unlink(false);
+      try{await connect(k,"join");close();toast("同期しました");}
+      catch(err){
+        $("joinBtn").disabled=false;
+        $("joinMsg").textContent=err.message==="notfound"?"このキーのデータは見つかりませんでした。キーを確認してください。":err.message==="decrypt"?"キーが正しくないため読み込めませんでした。":"接続できませんでした。通信を確認してください。";
+        if(prev)connect(prev,"resume").catch(()=>{});
+      }
+    });
+  }
+  $("ov").addEventListener("click",e=>{if(e.target.id==="ov")close();});
+  $("closeBtn").onclick=close;
+}
+
+/* ---------- buckets ---------- */
+function curAge(){const b=state.settings.birthYear;return b?THIS_YEAR-b:null;}
+function buckets(){
+  const {startAge,endAge,span}=state.settings;const out=[];
+  for(let a=startAge;a<=endAge;a+=span)out.push({from:a,to:Math.min(a+span-1,endAge)});
+  return out;
+}
+function stageOf(b){const s=state.settings;return b.from>=s.oldAge?"old":b.from>=s.midAge?"mid":"young";}
+function fmtCost(v){if(v==null)return "";return (Math.round(v*10)/10).toLocaleString("ja-JP")+"万円";}
+function ageLabel(b,isLast){
+  if(b.from===b.to)return `${b.from}歳`;
+  if(isLast&&b.to>=state.settings.endAge&&b.to-b.from+1<state.settings.span)return `${b.from}歳以上`;
+  return `${b.from}〜${b.to}歳`;
+}
+
+/* ---------- render ---------- */
+function setVal(id,v){const el=$(id);if(document.activeElement!==el)el.value=v;}
+function render(){
+  const st=state.settings, bs=buckets(), age=curAge();
+  setVal("birthYear",st.birthYear??"");setVal("startAge",st.startAge);setVal("endAge",st.endAge);setVal("spanYears",st.span);
+  setVal("youngEnd",st.midAge);setVal("oldStart",st.oldAge);
+  document.querySelectorAll("#spanRow .chip-btn").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.span===st.span)));
+  $("showDone").checked=prefs.showDone!==false;$("hidePast").checked=!!prefs.hidePast;$("skipEmpty").checked=!!prefs.skipEmpty;
+  $("setSummary").textContent=`${st.startAge}〜${st.endAge}歳・${st.span}年ごと`;
+
+  const total=state.items.length, done=state.items.filter(i=>i.done).length;
+  const cost=state.items.filter(i=>!i.done).reduce((s,i)=>s+(i.cost||0),0);
+  $("stats").innerHTML=`<span><b>${total}</b>件のやりたいこと</span><span><b>${done}</b>件 完了</span>`+
+    (cost?`<span><b>${esc(fmtCost(cost))}</b>未完了の予算合計</span>`:"")+
+    (age!=null?`<span><b>${age}</b>歳(${THIS_YEAR}年)</span><span><b>${Math.max(0,st.endAge-age)}</b>年 残り</span>`:"");
+
+  $("welcome").innerHTML=total?"":`<div class="welcome"><p>まだ何も入っていません。バケツの「+ 追加」から入れるか、参考例を入れて使い方を見てみてください。年数や年齢の範囲は「設定」で変えられます。</p><button class="btn primary" type="button" id="addSamples">参考例を入れる</button></div>`;
+  if(!total)$("addSamples").addEventListener("click",addSamples);
+
+  // build visible column list with breaks
+  const showDone=prefs.showDone!==false;
+  const entries=[];
+  bs.forEach((b,idx)=>{
+    const items=state.items.filter(i=>i.age>=b.from&&i.age<=b.to);
+    const past=age!=null&&b.to<age, now=age!=null&&age>=b.from&&age<=b.to;
+    const hidden=(prefs.hidePast&&past)||(prefs.skipEmpty&&!items.length&&!now);
+    entries.push({b,items,past,now,hidden,stage:stageOf(b),last:idx===bs.length-1});
+  });
+  const outItems=state.items.filter(i=>i.age<st.startAge||i.age>st.endAge);
+  if(outItems.length)entries.push({b:null,items:outItems,stage:"out",hidden:false});
+
+  // group into stage runs; insert breaks where hidden buckets were skipped
+  const groups=[];let prevVisibleIdx=-2, shade={};
+  entries.forEach((e,idx)=>{
+    if(e.hidden)return;
+    const brk=prevVisibleIdx>=-1&&idx!==prevVisibleIdx+1;
+    let g=groups[groups.length-1];
+    if(!g||g.stage!==e.stage){g={stage:e.stage,cols:[]};groups.push(g);}
+    if(brk||(e.stage==="out"&&groups.length>1&&g.cols.length===0))g.cols.push({brk:true});
+    shade[e.stage]=(shade[e.stage]||0)+1;
+    e.shade=STAGES[e.stage].v[(shade[e.stage]-1)%2];
+    g.cols.push(e);prevVisibleIdx=idx;
+  });
+
+  let html="";
+  groups.forEach(g=>{
+    let cols="",ticks="";
+    g.cols.forEach((c,k)=>{
+      if(c.brk){cols+=`<div class="brk" aria-hidden="true"></div>`;ticks+=`<div class="brk"></div>`;return;}
+      cols+=colHTML(c,showDone);
+      const next=g.cols[k+1];
+      const endsRun=!next||next.brk;
+      if(c.b)ticks+=`<div class="tick"><span>${c.b.from}</span>${endsRun?`<span class="r">${c.b.to+1}</span>`:""}</div>`;
+      else ticks+=`<div class="tick"></div>`;
+    });
+    html+=`<div class="group"><div class="cols">${cols}</div><div class="ticks">${ticks}</div><div class="stage-row"><span class="stage">${STAGES[g.stage].name}</span></div></div>`;
+  });
+  if(!groups.length)html=`<div class="hint" style="padding:30px 0">表示できるバケツがありません。「設定」で表示条件を見直してください。</div>`;
+  $("track").innerHTML=html;
+
+  if(!didScroll){didScroll=true;requestAnimationFrame(()=>{const n=document.querySelector(".col.now");const sc=$("scroller");if(n&&sc)sc.scrollLeft=Math.max(0,n.offsetLeft-sc.offsetLeft-40);});}
+}
+function colHTML(c,showDone){
+  const st=state.settings;
+  const list=c.items.slice().sort((a,b)=>a.age-b.age||a.created-b.created).filter(i=>showDone||!i.done);
+  const doneN=c.items.filter(i=>i.done).length;
+  const label=c.b?ageLabel(c.b,c.last):"範囲外";
+  const yrs=c.b&&st.birthYear?`${st.birthYear+c.b.from}–${st.birthYear+c.b.to}年`:"";
+  const body=list.length?`<ul class="plist">${list.map(itemHTML).join("")}</ul>`:`<div class="pempty">${c.items.length?"ぜんぶ完了!":"この年代にしたいことは?"}</div>`;
+  return `<div class="col${c.now?" now has-now":""}${c.past?" past":""}" id="${c.b?"b-"+c.b.from:"b-out"}" style="--fill:var(--${c.shade});--rim:var(--${c.shade}-rim)">
+    ${c.now?`<span class="now-pill">いまここ</span>`:""}
+    <div class="age-lab">${label}${yrs?`<span class="yr">${yrs}</span>`:""}</div>
+    <div class="pail">
+      <div class="rim"></div>
+      <div class="pbody">
+        ${body}
+        ${c.items.length?`<div class="pmeta">${doneN}/${c.items.length} 完了</div>`:""}
+        ${c.b?`<button type="button" class="padd" data-add="${c.b.from}">+ 追加</button>`:""}
+      </div>
+    </div>
+  </div>`;
+}
+function itemHTML(i){
+  return `<li class="pit${i.done?" done":""}">
+    <button type="button" class="ck" data-toggle="${esc(i.id)}" aria-pressed="${i.done}" aria-label="完了:${esc(i.title)}">${i.done?"✓":""}</button>
+    <button type="button" class="tx" data-edit="${esc(i.id)}">${esc(i.title)}${i.sample||i.cost!=null?`<small>${i.sample?"参考例 ":""}${i.cost!=null?esc(fmtCost(i.cost)):""}</small>`:""}</button>
+  </li>`;
+}
+
+/* ---------- modal ---------- */
+function openEditor(item,defAge){
+  const st=state.settings, isNew=!item;
+  const it=item||{id:uid(),title:"",age:defAge??st.startAge,cat:"travel",cost:null,done:false,memo:"",created:Date.now()};
+  modalOpen=true;
+  $("modalRoot").innerHTML=`<div class="overlay" id="ov"><form class="sheet" id="edForm" role="dialog" aria-modal="true" aria-labelledby="edTitle">
+    <h2 id="edTitle">${isNew?"したいことを追加":"したいことを編集"}</h2>
+    <div class="field"><label for="fTitle">したいこと</label><input id="fTitle" required maxlength="200" value="${esc(it.title)}" placeholder="例:47都道府県をすべて旅行で回る"></div>
+    <div class="row">
+      <div class="field"><label for="fAge">何歳ごろ(入れるバケツ)</label><input id="fAge" type="number" inputmode="numeric" min="0" max="130" value="${it.age}"></div>
+      <div class="field"><label for="fCost">予算(万円)</label><input id="fCost" type="number" inputmode="decimal" min="0" step="0.1" value="${it.cost??""}" placeholder="任意"></div>
+    </div>
+    <div class="field"><label for="fCat">分類</label><select id="fCat">${CATS.map(c=>`<option value="${c.id}"${c.id===it.cat?" selected":""}>${c.name}</option>`).join("")}</select></div>
+    <div class="field"><label for="fMemo">メモ</label><textarea id="fMemo" maxlength="2000" placeholder="誰と・どこで・準備することなど">${esc(it.memo)}</textarea></div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="fDone" ${it.done?"checked":""}> 完了した</label>
+    <div class="actions">
+      <div id="delArea">${isNew?"":`<button type="button" class="btn danger" id="delBtn">削除</button>`}</div>
+      <div><button type="button" class="btn ghost" id="cancelBtn">キャンセル</button><button type="submit" class="btn primary">${isNew?"追加":"保存"}</button></div>
+    </div>
+  </form></div>`;
+  const onKey=e=>{if(e.key==="Escape")close();};
+  const close=()=>{document.removeEventListener("keydown",onKey);$("modalRoot").innerHTML="";modalOpen=false;if(pendingRemote&&!dirty&&!saving)applyRemote(pendingRemote);pendingRemote=null;};
+  document.addEventListener("keydown",onKey);
+  $("ov").addEventListener("click",e=>{if(e.target.id==="ov")close();});
+  $("cancelBtn").onclick=close;
+  const bindDel=()=>{const del=$("delBtn");if(!del)return;del.onclick=()=>{
+    $("delArea").innerHTML=`<span class="confirm-del">削除しますか? <button type="button" class="btn danger" id="delYes">削除する</button><button type="button" class="btn ghost" id="delNo">やめる</button></span>`;
+    $("delYes").onclick=()=>{state.items=state.items.filter(x=>x.id!==it.id);pendingRemote=null;close();changed();toast("削除しました");};
+    $("delNo").onclick=()=>{$("delArea").innerHTML=`<button type="button" class="btn danger" id="delBtn">削除</button>`;bindDel();};
+  };};
+  bindDel();
+  $("edForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const title=$("fTitle").value.trim();if(!title){$("fTitle").focus();return;}
+    const costV=$("fCost").value.trim();
+    const n={...it,title,age:clampInt($("fAge").value,0,130,it.age),cost:costV===""?null:Math.max(0,+costV),cat:$("fCat").value,memo:$("fMemo").value.trim(),done:$("fDone").checked};
+    if(isNew)state.items.push(n);else state.items=state.items.map(x=>x.id===n.id?n:x);
+    pendingRemote=null;close();changed();toast(isNew?"追加しました":"保存しました");
+  });
+  setTimeout(()=>$("fTitle").focus(),30);
+}
+let toastT;
+function toast(msg){$("toastRoot").innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`;clearTimeout(toastT);toastT=setTimeout(()=>$("toastRoot").innerHTML="",1800);}
+
+function addSamples(){
+  const now=Date.now(), st=state.settings;
+  const ex=[
+    ["47都道府県をすべて旅行で回る",25,"travel",150],["パラグライダーの体験に行く",27,"health",3],
+    ["本を書く",40,"work",null],["海外にプチ留学する",42,"learn",60],["フルマラソンに挑戦する",44,"health",2],
+    ["FPの資格を取る",45,"learn",5],["子どもを大学に進学させる",47,"family",400],["2カ月に1回山登りに行く",48,"health",null],
+    ["サイドFIRE達成",50,"work",null],["カメラを趣味にする",52,"hobby",30],["世界遺産を巡る旅に出かける",54,"travel",120],
+    ["ボランティア活動する",75,"other",null],["テニスを楽しむ",76,"health",null]
+  ];
+  ex.forEach((e,k)=>state.items.push({id:uid(),title:e[0],age:Math.max(st.startAge,Math.min(e[1],st.endAge)),cat:e[2],cost:e[3],done:false,memo:"",sample:true,created:now+k}));
+  changed();toast("参考例を入れました。タップで編集・削除できます");
+}
+
+/* ---------- events ---------- */
+function onSetting(){
+  const st=state.settings;
+  const by=$("birthYear").value.trim();
+  st.birthYear=by===""?null:clampInt(by,1900,2100,null);
+  st.startAge=clampInt($("startAge").value,0,120,st.startAge);
+  st.endAge=clampInt($("endAge").value,1,130,st.endAge);
+  st.span=clampInt($("spanYears").value,1,50,st.span);
+  st.midAge=clampInt($("youngEnd").value,1,120,st.midAge);
+  st.oldAge=clampInt($("oldStart").value,1,130,st.oldAge);
+  if(st.endAge<=st.startAge)st.endAge=st.startAge+st.span;
+  if(st.oldAge<=st.midAge)st.oldAge=st.midAge+1;
+  changed();
+}
+["birthYear","startAge","endAge","spanYears","youngEnd","oldStart"].forEach(id=>$(id).addEventListener("change",onSetting));
+$("spanRow").addEventListener("click",e=>{const b=e.target.closest("[data-span]");if(!b)return;state.settings.span=+b.dataset.span;changed();});
+[["showDone","showDone"],["hidePast","hidePast"],["skipEmpty","skipEmpty"]].forEach(([id,k])=>$(id).addEventListener("change",e=>{prefs[k]=e.target.checked;savePrefs();render();}));
+$("track").addEventListener("click",e=>{
+  const a=e.target.closest("[data-add]");if(a){openEditor(null,+a.dataset.add);return;}
+  const t=e.target.closest("[data-toggle]");if(t){const it=state.items.find(x=>x.id===t.dataset.toggle);if(it){it.done=!it.done;changed();}return;}
+  const ed=e.target.closest("[data-edit]");if(ed){const it=state.items.find(x=>x.id===ed.dataset.edit);if(it)openEditor(it);}
+});
+
+/* ---------- boot ---------- */
+$("syncBtn").addEventListener("click",()=>openSyncSheet());
+function bindDelAll(){$("delAllBtn").onclick=()=>{
+  $("delAllArea").innerHTML=`<span class="confirm-del">クラウドの暗号化データを削除し、すべての端末で同期を止めます。この端末の内容は残ります。 <button type="button" class="btn danger" id="delAllYes">削除する</button><button type="button" class="btn ghost" id="delAllNo">やめる</button></span>`;
+  const reset=()=>{$("delAllArea").innerHTML=`<button type="button" class="btn danger" id="delAllBtn">クラウドから削除して同期をやめる</button>`;bindDelAll();};
+  $("delAllNo").onclick=reset;
+  $("delAllYes").onclick=()=>{if(!docRef)return;const ref=docRef;unlink(false);ref.delete().then(()=>toast("クラウドから削除しました")).catch(()=>toast("削除できませんでした"));reset();};
+};}
+bindDelAll();
+const local=loadLocal();
+if(local)state=normalize(local);
+render();
+initSync();
+})();
+</script>
+
+</body>
+</html>
