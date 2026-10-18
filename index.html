@@ -80,6 +80,11 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-a
 .copyrow{display:flex;flex-wrap:wrap;gap:8px}
 .or{display:flex;align-items:center;gap:10px;color:var(--ink-3);font-size:12px}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.gate{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:auto;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.gate-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px 22px;max-width:420px;width:100%;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.gate-card .title-box{align-self:flex-start}
+.gate-card p{margin:0}
+.gate-card input{font-family:var(--f-mono);font-size:20px;letter-spacing:.08em;text-align:center}
 .danger-zone{width:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:12px}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;font-weight:500}
 .wrap{max-width:1240px;margin:0 auto;padding-block:20px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
@@ -258,6 +263,16 @@ window.FIREBASE_CONFIG = {
   </footer>
 </div>
 
+<div class="gate" id="gate" hidden>
+  <form class="gate-card" id="gateForm">
+    <div class="title-box"><h1>タイムバケット</h1></div>
+    <p>このアプリは招待された方だけが使えます。管理者から受け取った招待コードを入力してください。</p>
+    <div class="field"><label for="gateCode">招待コード</label><input id="gateCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX"></div>
+    <p class="note" id="gateMsg" role="status"></p>
+    <button class="btn primary" type="submit" id="gateBtn">はじめる</button>
+    <p class="note">コードの入力は、この端末では最初の1回だけです。名前やメールアドレスは要りません。書いた内容は管理者にも見えません。</p>
+  </form>
+</div>
 <div id="modalRoot"></div>
 <div id="toastRoot"></div>
 
@@ -359,7 +374,8 @@ async function doFlush(){
   ref.set(body).then(()=>{if(ref===docRef&&!dirty)setSync("ok","同期済み(暗号化)");}).catch(e=>{
     if(ref!==docRef)return;
     dirty=true;
-    setSync("err",e&&e.code==="permission-denied"?"保存が拒否されました":"保存できませんでした。通信を確認してください");
+    if(e&&e.code==="permission-denied"){lockApp();return;}
+    setSync("err","保存できませんでした。通信を確認してください");
   });
 }
 function applyRemote(d){state=d;saveLocal();render();}
@@ -420,7 +436,7 @@ function subscribe(){
     lastCt=d.ct;
     if(modalOpen){pendingRemote=remote;return;}
     applyRemote(remote);setSync("ok","同期済み(暗号化)");
-  },e=>setSync("err","同期が止まりました。再読み込みしてください"));
+  },e=>{if(e&&e.code==="permission-denied")lockApp();else setSync("err","同期が止まりました。再読み込みしてください");});
 }
 function unlink(clearData){
   if(unsub){unsub();unsub=null;}
@@ -430,28 +446,94 @@ function unlink(clearData){
   setSync("local","この端末にのみ保存");showSyncUI();
 }
 
-function initSync(){
+/* ---------- 招待コード ----------
+   members/<匿名ユーザーID> に招待コードを登録した端末だけが vaults を読み書きできる(Firestore ルールで強制)。
+   管理者は invites/<コード> の active を false にすると、そのコードの利用者を止められる。 */
+const INV_LS="timebucket.invite", MEM_LS="timebucket.member";
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}
+function parseInvite(str){
+  const k=String(str||"").toUpperCase().replace(/[^0-9A-Z]/g,"").replace(/O/g,"0").replace(/[IL]/g,"1").replace(/U/g,"V");
+  return k.length===8&&[...k].every(c=>ALPH.includes(c))?k.slice(0,4)+"-"+k.slice(4):null;
+}
+let gateNext=null;
+function showGate(msg,prefill){
+  $("gate").hidden=false;$("gateMsg").textContent=msg||"";
+  if(prefill)$("gateCode").value=prefill;
+  $("gateBtn").disabled=false;
+}
+function hideGate(){$("gate").hidden=true;}
+function lockApp(){
+  lsSet(MEM_LS,null);
+  if(unsub){unsub();unsub=null;}
+  docRef=null;
+  setSync("err","利用の確認が必要です");
+  showGate("利用の許可を確認できませんでした。招待コードを入力してください。",parseInvite(lsGet(INV_LS)));
+}
+async function checkMember(){
+  const u=await ensureAuth();
+  try{await fdb.collection("members").doc(u.uid).get();return "ok";}
+  catch(e){return e&&e.code==="permission-denied"?"denied":"offline";}
+}
+$("gateForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const code=parseInvite($("gateCode").value);
+  if(!code){$("gateMsg").textContent="招待コードは英数字8文字です(ハイフンは省略できます)。";return;}
+  if(!fdb){$("gateMsg").textContent="同期の設定が読み込めていません。再読み込みしてください。";return;}
+  $("gateBtn").disabled=true;$("gateMsg").textContent="確認中…";
+  try{
+    const u=await ensureAuth();
+    await fdb.collection("members").doc(u.uid).set({code});
+    if(await checkMember()!=="ok")throw {code:"permission-denied"};
+    lsSet(INV_LS,code);lsSet(MEM_LS,"1");hideGate();toast("ようこそ");
+    const next=gateNext;gateNext=null;startSync(next);
+  }catch(err){
+    $("gateBtn").disabled=false;
+    $("gateMsg").textContent=err&&err.code==="permission-denied"?"この招待コードは使えません。コードを確かめるか、管理者に問い合わせてください。":"通信できませんでした。つながる場所でもう一度お試しください。";
+  }
+});
+
+function startSync(hashKey){
+  const k=storedKey();
+  const afterResume=()=>{const hk=parseKey(hashKey);if(hk&&hk!==syncKey)openSyncSheet(hk);};
+  if(k&&parseKey(k)){
+    setSync("saving","同期中…");
+    connect(k,"resume").then(afterResume).catch(e=>{
+      if(e&&e.code==="permission-denied"){lockApp();gateNext=hashKey;return;}
+      if(e.message==="gone"){unlink(false);toast("同期データが見つからないため、同期を解除しました");}
+      else{setSync("err","同期できませんでした。再読み込みしてください");}
+      afterResume();
+    });
+  }else{setSync("local","この端末にのみ保存");afterResume();}
+}
+
+async function initSync(){
   const cfg=window.FIREBASE_CONFIG||{};
   if(!window.firebase||!window.crypto||!crypto.subtle||!cfg.apiKey||/ここに/.test(cfg.apiKey)){
     setSync("local","この端末にのみ保存");showSyncUI();return;
   }
   try{firebase.initializeApp(cfg);auth=firebase.auth();fdb=firebase.firestore();}
   catch(e){setSync("err","同期の設定を読み込めませんでした");return;}
-  setSync("local","この端末にのみ保存");showSyncUI();
+  showSyncUI();
   window.addEventListener("online",()=>{if(docRef)setSync(dirty?"saving":"ok",dirty?"保存中…":"同期済み(暗号化)");});
   window.addEventListener("offline",()=>{if(docRef)setSync("saving","オフライン(つながると送信)");});
-  const hashKey=(location.hash.match(/^#k=([0-9A-Za-z-]+)$/)||[])[1];
-  if(hashKey)history.replaceState(null,"",location.pathname+location.search);
-  const k=storedKey();
-  const afterResume=()=>{const hk=parseKey(hashKey);if(hk&&hk!==syncKey)openSyncSheet(hk);};
-  if(k&&parseKey(k)){
-    setSync("saving","同期中…");
-    connect(k,"resume").then(afterResume).catch(e=>{
-      if(e.message==="gone"){unlink(false);toast("同期データが見つからないため、同期を解除しました");}
-      else{setSync("err","同期できませんでした。再読み込みしてください");}
-      afterResume();
-    });
-  }else afterResume();
+  const hp=new URLSearchParams(location.hash.slice(1));
+  const hashKey=hp.get("k"), hashInv=parseInvite(hp.get("i"));
+  if(location.hash)history.replaceState(null,"",location.pathname+location.search);
+  const known=lsGet(MEM_LS)==="1";
+  if(!known)showGate("",hashInv||parseInvite(lsGet(INV_LS)));
+  setSync("saving","確認中…");
+  let r;
+  try{r=await checkMember();}catch(e){r="offline";}
+  if(r==="ok"){
+    lsSet(MEM_LS,"1");hideGate();startSync(hashKey);
+  }else if(r==="offline"&&known){
+    setSync("saving","オフライン(この端末に保存中)");
+  }else{
+    gateNext=hashKey;
+    showGate(r==="offline"?"通信できません。つながる場所で招待コードを入力してください。":(known?"利用の許可が取り消されたか、確認が必要です。招待コードを入力してください。":""),hashInv||parseInvite(lsGet(INV_LS)));
+    lsSet(MEM_LS,null);setSync("local","利用の確認待ち");
+  }
 }
 
 /* ---------- 同期キーの画面 ---------- */
@@ -460,7 +542,7 @@ function copyText(text,btn){
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(done).catch(()=>prompt("コピーしてください",text));
   else prompt("コピーしてください",text);
 }
-function shareLink(k){return location.origin+location.pathname+"#k="+fmtKey(k);}
+function shareLink(k){const inv=parseInvite(lsGet(INV_LS));return location.origin+location.pathname+"#k="+fmtKey(k)+(inv?"&i="+inv:"");}
 function openSyncSheet(prefill){
   modalOpen=true;
   const close=()=>{document.removeEventListener("keydown",onKey);$("modalRoot").innerHTML="";modalOpen=false;if(pendingRemote&&!dirty)applyRemote(pendingRemote);pendingRemote=null;};

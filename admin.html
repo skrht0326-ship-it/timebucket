@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>招待コード管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 1列の管理画面。上に発行フォーム、下に招待コードの表(状態を札で表示) */
+:root{
+  --bg:#f7f8fa; --surface:#ffffff; --surface-2:#f0f2f5; --line:#d4d9e0;
+  --ink:#1c1f24; --ink-2:#555c66; --ink-3:#8a919b;
+  --title-bg:#c4d7e6; --title-line:#2b3440;
+  --accent:#2b6f9e; --accent-ink:#ffffff;
+  --ok:#1f7a52; --ok-soft:#d9efe3; --off:#8a919b; --off-soft:#eceef1;
+  --danger:#b3372f; --danger-soft:#f6dedb;
+  --f-body:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#14171c; --surface:#1c2027; --surface-2:#252a33; --line:#343b46;
+  --ink:#eceff3; --ink-2:#aeb5c0; --ink-3:#7c8592;
+  --title-bg:#2a3d4d; --title-line:#9fb4c6;
+  --accent:#6fb3e3; --accent-ink:#0f1a24;
+  --ok:#6fd3a0; --ok-soft:#173a2a; --off:#7c8592; --off-soft:#2a2f37;
+  --danger:#ec7a70; --danger-soft:#3c1f1d;
+  color-scheme:dark;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;font-weight:500}
+[hidden]{display:none!important}
+.wrap{max-width:900px;margin:0 auto;padding-block:20px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;justify-content:space-between}
+.title-box{background:var(--title-bg);border:1.5px solid var(--title-line);border-radius:12px;padding:8px 26px}
+.title-box h1{margin:0;font-size:22px;font-weight:900;letter-spacing:.1em}
+.acct{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2{margin:0;font-size:16px;font-weight:900}
+.note{margin:0;font-size:13px;color:var(--ink-2)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12px;font-weight:700;color:var(--ink-2)}
+.field input{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+.btn{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:7px 14px;font-size:14px;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.small{padding:3px 10px;font-size:12.5px}
+.btn.danger{color:var(--danger);background:var(--danger-soft);border-color:var(--danger-soft)}
+.tablebox{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:620px}
+th{text-align:left;font-size:12px;color:var(--ink-2);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.code{font-family:var(--f-mono);font-weight:600;letter-spacing:.06em;white-space:nowrap}
+.date{font-family:var(--f-mono);font-size:12px;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:1px 10px;white-space:nowrap}
+.pill.on{background:var(--ok-soft);color:var(--ok)}
+.pill.off{background:var(--off-soft);color:var(--off)}
+tr.inactive .code,tr.inactive .memo{color:var(--ink-3)}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px}
+.msg{font-size:14px;color:var(--danger)}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title-box"><h1>招待コード管理</h1></div>
+    <div class="acct"><span id="who"></span><button class="btn" id="loginBtn" type="button">管理者としてGoogleでログイン</button><button class="btn" id="logoutBtn" type="button" hidden>ログアウト</button></div>
+  </header>
+
+  <p class="note">タイムバケットを使える人を管理します。1人に1つコードを発行して渡してください。「停止」にすると、そのコードで登録したすべての端末で同期が使えなくなります。利用者が書いた内容は暗号化されているため、ここからは見えません。</p>
+  <p class="msg" id="msg" role="status"></p>
+
+  <section class="card" id="issueCard" hidden>
+    <h2>招待コードを発行</h2>
+    <div class="row">
+      <div class="field" style="flex:1 1 240px"><label for="memo">誰に渡すか(メモ・管理者だけが見られます)</label><input id="memo" maxlength="60" placeholder="例:田中さん"></div>
+      <div class="field" style="width:90px"><label for="count">数</label><input id="count" type="number" min="1" max="20" value="1" inputmode="numeric"></div>
+      <button class="btn primary" id="issueBtn" type="button">発行する</button>
+    </div>
+  </section>
+
+  <section class="card" id="listCard" hidden>
+    <h2>発行済みの招待コード <span class="note" id="countNote"></span></h2>
+    <div class="tablebox"><table>
+      <thead><tr><th>コード</th><th>メモ</th><th>状態</th><th>発行日</th><th>操作</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </section>
+</div>
+<div id="toastRoot"></div>
+
+<script>
+(function(){
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyDw_x7nsVGR1yWYtXxBTmOHv5CFRqcDJWU",
+  authDomain:"timebucket-207d4.firebaseapp.com",
+  projectId:"timebucket-207d4",
+  storageBucket:"timebucket-207d4.firebasestorage.app",
+  messagingSenderId:"101966198709",
+  appId:"1:101966198709:web:ad437fd2cdf5d4e5d1cbfc"
+};
+const ALPH="0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let toastT;function toast(m){$("toastRoot").innerHTML=`<div class="toast" role="status">${esc(m)}</div>`;clearTimeout(toastT);toastT=setTimeout(()=>$("toastRoot").innerHTML="",1800);}
+function newCode(){const r=crypto.getRandomValues(new Uint8Array(8));let k="";r.forEach(b=>k+=ALPH[b&31]);return k.slice(0,4)+"-"+k.slice(4);}
+const appUrl=new URL("./",location.href).href;
+const inviteLink=c=>appUrl+"#i="+c;
+
+// アプリ本体(匿名ログイン)と混ざらないよう、別名のアプリとして初期化する
+const app=firebase.initializeApp(FIREBASE_CONFIG,"admin");
+const auth=app.auth(), db=app.firestore();
+let unsub=null, docs=[];
+
+$("loginBtn").onclick=()=>{
+  const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
+  auth.signInWithPopup(p).catch(e=>{
+    if(e&&(e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment"))auth.signInWithRedirect(p);
+    else if(!(e&&/popup-closed|cancelled-popup/.test(e.code)))$("msg").textContent="ログインできませんでした("+(e&&e.code||"")+")";
+  });
+};
+$("logoutBtn").onclick=()=>auth.signOut();
+auth.getRedirectResult().catch(()=>{});
+
+auth.onAuthStateChanged(u=>{
+  if(unsub){unsub();unsub=null;}
+  $("loginBtn").hidden=!!u;$("logoutBtn").hidden=!u;$("who").textContent=u?(u.email||""):"";
+  $("issueCard").hidden=$("listCard").hidden=true;$("msg").textContent="";
+  if(!u)return;
+  unsub=db.collection("invites").orderBy("created","desc").onSnapshot(snap=>{
+    docs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    $("issueCard").hidden=$("listCard").hidden=false;render();
+  },e=>{
+    $("msg").textContent=e&&e.code==="permission-denied"?"このアカウントには管理者の権限がありません。":"読み込めませんでした。再読み込みしてください。";
+  });
+});
+
+function fmtDate(t){if(!t||!t.toDate)return "";const d=t.toDate();return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;}
+function render(){
+  const on=docs.filter(d=>d.active).length;
+  $("countNote").textContent=`(有効 ${on} / 全 ${docs.length})`;
+  $("rows").innerHTML=docs.length?docs.map(d=>`<tr class="${d.active?"":"inactive"}">
+    <td class="code">${esc(d.id)}</td>
+    <td class="memo">${esc(d.memo||"")}</td>
+    <td><span class="pill ${d.active?"on":"off"}">${d.active?"有効":"停止中"}</span></td>
+    <td class="date">${fmtDate(d.created)}</td>
+    <td><div class="acts" data-id="${esc(d.id)}">
+      <button class="btn small" type="button" data-act="link">招待リンクをコピー</button>
+      <button class="btn small" type="button" data-act="toggle">${d.active?"停止":"再開"}</button>
+      <button class="btn small danger" type="button" data-act="del">削除</button>
+    </div></td></tr>`).join(""):`<tr><td colspan="5" class="note">まだ招待コードがありません。上のフォームから発行してください。</td></tr>`;
+}
+function copy(text,btn){
+  const done=()=>{const o=btn.textContent;btn.textContent="コピーしました";setTimeout(()=>btn.textContent=o,1500);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(done).catch(()=>prompt("コピーしてください",text));
+  else prompt("コピーしてください",text);
+}
+$("rows").addEventListener("click",async e=>{
+  const b=e.target.closest("[data-act]");if(!b)return;
+  const id=b.parentElement.dataset.id, d=docs.find(x=>x.id===id);if(!d)return;
+  const act=b.dataset.act;
+  if(act==="link")copy(inviteLink(id),b);
+  else if(act==="toggle"){b.disabled=true;try{await db.collection("invites").doc(id).update({active:!d.active});toast(d.active?"停止しました":"再開しました");}catch(err){toast("変更できませんでした");b.disabled=false;}}
+  else if(act==="del"){
+    if(b.dataset.confirm!=="1"){b.dataset.confirm="1";b.textContent="本当に削除";setTimeout(()=>{if(b.isConnected){b.dataset.confirm="";b.textContent="削除";}},4000);return;}
+    try{await db.collection("invites").doc(id).delete();toast("削除しました");}catch(err){toast("削除できませんでした");}
+  }
+});
+$("issueBtn").onclick=async()=>{
+  const n=Math.min(20,Math.max(1,parseInt($("count").value,10)||1));
+  const memo=$("memo").value.trim().slice(0,60);
+  $("issueBtn").disabled=true;
+  try{
+    const batch=db.batch();
+    for(let i=0;i<n;i++)batch.set(db.collection("invites").doc(newCode()),{active:true,memo,created:firebase.firestore.FieldValue.serverTimestamp()});
+    await batch.commit();$("memo").value="";toast(`${n}件発行しました`);
+  }catch(err){toast("発行できませんでした");}
+  $("issueBtn").disabled=false;
+};
+})();
+</script>
+</body>
+</html>
