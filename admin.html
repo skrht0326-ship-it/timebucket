@@ -64,6 +64,14 @@ tr.inactive .code,tr.inactive .memo{color:var(--ink-3)}
 .acts{display:flex;gap:6px;flex-wrap:wrap}
 .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px}
 .msg{font-size:14px;color:var(--danger)}
+.devcount{font-family:var(--f-mono);font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.devcount.full{color:var(--danger)}
+tr.detail td{background:var(--surface-2)}
+.devlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.devlist li{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+.devlist .dn{font-weight:700;min-width:4em}
+.detail-row{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-start}
+.detail-row .field input{width:80px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -84,6 +92,7 @@ tr.inactive .code,tr.inactive .memo{color:var(--ink-3)}
     <div class="row">
       <div class="field" style="flex:1 1 240px"><label for="memo">誰に渡すか(メモ・管理者だけが見られます)</label><input id="memo" maxlength="60" placeholder="例:田中さん"></div>
       <div class="field" style="width:90px"><label for="count">数</label><input id="count" type="number" min="1" max="20" value="1" inputmode="numeric"></div>
+      <div class="field" style="width:120px"><label for="maxDev">使える端末の台数</label><input id="maxDev" type="number" min="1" max="20" value="3" inputmode="numeric"></div>
       <button class="btn primary" id="issueBtn" type="button">発行する</button>
     </div>
   </section>
@@ -91,7 +100,7 @@ tr.inactive .code,tr.inactive .memo{color:var(--ink-3)}
   <section class="card" id="listCard" hidden>
     <h2>発行済みの招待コード <span class="note" id="countNote"></span></h2>
     <div class="tablebox"><table>
-      <thead><tr><th>コード</th><th>メモ</th><th>状態</th><th>発行日</th><th>操作</th></tr></thead>
+      <thead><tr><th>コード</th><th>メモ</th><th>状態</th><th>登録端末</th><th>発行日</th><th>操作</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
   </section>
@@ -144,20 +153,36 @@ auth.onAuthStateChanged(u=>{
   });
 });
 
-function fmtDate(t){if(!t||!t.toDate)return "";const d=t.toDate();return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;}
+function fmtDate(t,withTime){if(!t||!t.toDate)return "";const d=t.toDate();const p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())}`+(withTime?` ${p(d.getHours())}:${p(d.getMinutes())}`:"");}
+const maxOf=d=>Number.isFinite(d.maxDevices)?d.maxDevices:3;
+const devsOf=d=>Object.entries(d.devices||{}).sort((a,b)=>((a[1]&&a[1].seconds)||0)-((b[1]&&b[1].seconds)||0));
+let openId=null;
 function render(){
   const on=docs.filter(d=>d.active).length;
   $("countNote").textContent=`(有効 ${on} / 全 ${docs.length})`;
-  $("rows").innerHTML=docs.length?docs.map(d=>`<tr class="${d.active?"":"inactive"}">
+  $("rows").innerHTML=docs.length?docs.map(d=>{
+    const devs=devsOf(d), max=maxOf(d), full=devs.length>=max;
+    const main=`<tr class="${d.active?"":"inactive"}">
     <td class="code">${esc(d.id)}</td>
     <td class="memo">${esc(d.memo||"")}</td>
     <td><span class="pill ${d.active?"on":"off"}">${d.active?"有効":"停止中"}</span></td>
+    <td><span class="devcount${full?" full":""}">${devs.length} / ${max}台</span></td>
     <td class="date">${fmtDate(d.created)}</td>
     <td><div class="acts" data-id="${esc(d.id)}">
       <button class="btn small" type="button" data-act="link">招待リンクをコピー</button>
+      <button class="btn small" type="button" data-act="detail" aria-expanded="${openId===d.id}">端末</button>
       <button class="btn small" type="button" data-act="toggle">${d.active?"停止":"再開"}</button>
       <button class="btn small danger" type="button" data-act="del">削除</button>
-    </div></td></tr>`).join(""):`<tr><td colspan="5" class="note">まだ招待コードがありません。上のフォームから発行してください。</td></tr>`;
+    </div></td></tr>`;
+    if(openId!==d.id)return main;
+    const list=devs.length?`<ul class="devlist">${devs.map(([uid,t],i)=>`<li><span class="dn">端末${i+1}</span><span class="date">${fmtDate(t,true)||"登録中"} に登録</span><span class="acts" data-id="${esc(d.id)}" data-uid="${esc(uid)}"><button class="btn small danger" type="button" data-act="rmdev">この端末を取り消す</button></span></li>`).join("")}</ul>`:`<p class="note">まだ登録された端末はありません。</p>`;
+    return main+`<tr class="detail"><td colspan="6"><div class="detail-row">
+      <div style="flex:1 1 280px;display:flex;flex-direction:column;gap:8px">${list}
+        ${devs.length?`<div class="acts" data-id="${esc(d.id)}"><button class="btn small danger" type="button" data-act="rmall">すべての端末登録を取り消す</button></div>`:""}
+        <p class="note">取り消した端末は次の操作から使えなくなり、招待コードの画面に戻ります。本人が再びコードを入れると、空きがあれば登録し直せます。他人に渡されていそうなときは、すべて取り消して本人に新しいコードを渡してください。</p></div>
+      <div class="field"><label for="max-${esc(d.id)}">使える端末の台数</label><div class="acts" data-id="${esc(d.id)}"><input id="max-${esc(d.id)}" type="number" min="1" max="20" value="${max}" inputmode="numeric"><button class="btn small" type="button" data-act="setmax">変更</button></div></div>
+    </div></td></tr>`;
+  }).join(""):`<tr><td colspan="6" class="note">まだ招待コードがありません。上のフォームから発行してください。</td></tr>`;
 }
 function copy(text,btn){
   const done=()=>{const o=btn.textContent;btn.textContent="コピーしました";setTimeout(()=>btn.textContent=o,1500);};
@@ -167,21 +192,27 @@ function copy(text,btn){
 $("rows").addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;
   const id=b.parentElement.dataset.id, d=docs.find(x=>x.id===id);if(!d)return;
-  const act=b.dataset.act;
+  const act=b.dataset.act, ref=db.collection("invites").doc(id);
+  const confirm2=label=>{if(b.dataset.confirm==="1")return true;b.dataset.confirm="1";const o=b.textContent;b.textContent=label;setTimeout(()=>{if(b.isConnected){b.dataset.confirm="";b.textContent=o;}},4000);return false;};
   if(act==="link")copy(inviteLink(id),b);
+  else if(act==="detail"){openId=openId===id?null:id;render();}
+  else if(act==="rmdev"){if(!confirm2("本当に取り消す"))return;const uid=b.parentElement.dataset.uid;try{await ref.update({["devices."+uid]:firebase.firestore.FieldValue.delete()});toast("端末の登録を取り消しました");}catch(err){toast("取り消せませんでした");}}
+  else if(act==="rmall"){if(!confirm2("本当にすべて取り消す"))return;try{await ref.update({devices:{}});toast("すべての端末登録を取り消しました");}catch(err){toast("取り消せませんでした");}}
+  else if(act==="setmax"){const n=parseInt($("max-"+id).value,10);if(!(n>=1&&n<=20)){toast("1〜20台で指定してください");return;}try{await ref.update({maxDevices:n});toast(`${n}台に変更しました`);}catch(err){toast("変更できませんでした");}}
   else if(act==="toggle"){b.disabled=true;try{await db.collection("invites").doc(id).update({active:!d.active});toast(d.active?"停止しました":"再開しました");}catch(err){toast("変更できませんでした");b.disabled=false;}}
   else if(act==="del"){
     if(b.dataset.confirm!=="1"){b.dataset.confirm="1";b.textContent="本当に削除";setTimeout(()=>{if(b.isConnected){b.dataset.confirm="";b.textContent="削除";}},4000);return;}
-    try{await db.collection("invites").doc(id).delete();toast("削除しました");}catch(err){toast("削除できませんでした");}
+    try{await ref.delete();if(openId===id)openId=null;toast("削除しました");}catch(err){toast("削除できませんでした");}
   }
 });
 $("issueBtn").onclick=async()=>{
   const n=Math.min(20,Math.max(1,parseInt($("count").value,10)||1));
   const memo=$("memo").value.trim().slice(0,60);
+  const maxDevices=Math.min(20,Math.max(1,parseInt($("maxDev").value,10)||3));
   $("issueBtn").disabled=true;
   try{
     const batch=db.batch();
-    for(let i=0;i<n;i++)batch.set(db.collection("invites").doc(newCode()),{active:true,memo,created:firebase.firestore.FieldValue.serverTimestamp()});
+    for(let i=0;i<n;i++)batch.set(db.collection("invites").doc(newCode()),{active:true,memo,maxDevices,devices:{},created:firebase.firestore.FieldValue.serverTimestamp()});
     await batch.commit();$("memo").value="";toast(`${n}件発行しました`);
   }catch(err){toast("発行できませんでした");}
   $("issueBtn").disabled=false;

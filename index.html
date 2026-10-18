@@ -483,13 +483,17 @@ $("gateForm").addEventListener("submit",async e=>{
   $("gateBtn").disabled=true;$("gateMsg").textContent="確認中…";
   try{
     const u=await ensureAuth();
-    await fdb.collection("members").doc(u.uid).set({code});
+    // 招待コードにこの端末を登録(上限台数はルール側で確認)し、同時に端末の登録票を作る
+    const batch=fdb.batch();
+    batch.update(fdb.collection("invites").doc(code),{["devices."+u.uid]:firebase.firestore.FieldValue.serverTimestamp()});
+    batch.set(fdb.collection("members").doc(u.uid),{code});
+    await batch.commit();
     if(await checkMember()!=="ok")throw {code:"permission-denied"};
     lsSet(INV_LS,code);lsSet(MEM_LS,"1");hideGate();toast("ようこそ");
     const next=gateNext;gateNext=null;startSync(next);
   }catch(err){
     $("gateBtn").disabled=false;
-    $("gateMsg").textContent=err&&err.code==="permission-denied"?"この招待コードは使えません。コードを確かめるか、管理者に問い合わせてください。":"通信できませんでした。つながる場所でもう一度お試しください。";
+    $("gateMsg").textContent=err&&(err.code==="permission-denied"||err.code==="not-found")?"このコードは使えないか、登録できる端末の数の上限に達しています。コードを確かめるか、管理者に問い合わせてください。":"通信できませんでした。つながる場所でもう一度お試しください。";
   }
 });
 
