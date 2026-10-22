@@ -72,6 +72,17 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-a
 .login{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700}
 .login svg{width:16px;height:16px}
 .who{font-size:12px;color:var(--ink-2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon-btn{flex:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer;padding:0}
+.icon-btn svg{width:24px;height:24px}
+#syncBtn[data-state="ok"]{color:var(--check)}
+#syncBtn[data-state="saving"] svg{animation:tbspin 1.2s linear infinite}
+#syncBtn[data-state="err"]{color:var(--danger);border-color:var(--danger)}
+@keyframes tbspin{to{transform:rotate(360deg)}}
+.codebox{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--f-mono);font-size:13px;word-break:break-all;resize:vertical}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sheet-head h2{margin:0}
+.note.msg-ok{color:var(--check)}
+.note.msg-err{color:var(--danger)}
 .linkbtn{border:0;background:none;color:var(--accent);font-size:12px;padding:2px 4px;text-decoration:underline}
 .privacy{font-size:12px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
 .keybox{font-family:var(--f-mono);font-size:clamp(15px,4.2vw,20px);font-weight:600;letter-spacing:.04em;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;word-break:break-all;user-select:all}
@@ -215,7 +226,7 @@ window.FIREBASE_CONFIG = {
     <p class="lead">自分の年齢・年代をバケツに見立て、各年代ごとに自分のしたいことを記載したもの</p>
     <div class="acct">
       <span class="sync" id="sync" data-s="local"><i></i><span id="syncText">読み込み中…</span></span>
-      <button type="button" class="login" id="syncBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span id="syncBtnText">PC・スマホで同期</span></button>
+      <button type="button" class="icon-btn" id="syncBtn" aria-label="同期の設定" title="同期の設定" data-state="local" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5H7z"/><path d="M10 13.5l2-2 2 2M12 11.5V16"/></svg></button>
     </div>
   </header>
 
@@ -255,7 +266,7 @@ window.FIREBASE_CONFIG = {
     <div class="hint">バケツの中の文字をタップすると編集、○で完了。横にスクロールできます。</div>
   </section>
 
-  <div class="privacy" id="privacyNote">ログインもメールアドレスも不要です。「PC・スマホで同期」で作られる<b>同期キー</b>を自分の端末どうしで共有すると、同じ内容が表示されます。データはこの端末の中で同期キーを使って暗号化してから送るため、運営者を含めて同期キーを持たない人には中身が読めません。同期キーをなくすと誰にも復元できないので、控えておいてください。</div>
+  <div class="privacy" id="privacyNote">ログインもメールアドレスも不要です。右上の雲マーク（PC・スマホで同期）から、1台目は招待コード、2台目以降は1台目でコピーした<b>同期用リンク</b>を貼ると、同じ内容が表示されます。データはこの端末の中で暗号化してから送るため、運営者を含めて同期用リンクを持たない人には中身が読めません。同期用リンクをなくすと誰にも復元できないので、控えておいてください。</div>
 
   <footer>
     <span>タイムバケット</span>
@@ -356,7 +367,7 @@ async function decryptDoc(d){
   return normalize(JSON.parse(td.decode(pt)));
 }
 
-function setSync(s,text){$("sync").dataset.s=s;$("syncText").textContent=text;}
+function setSync(s,text){$("sync").dataset.s=s;$("syncText").textContent=text;$("syncBtn").dataset.state=s;}
 function changed(){
   saveLocal();render();
   if(!docRef)return;
@@ -385,7 +396,6 @@ function storedKey(){try{return localStorage.getItem(KEY_LS)}catch(e){return nul
 
 function showSyncUI(){
   $("syncBtn").hidden=!fdb;
-  $("syncBtnText").textContent=syncKey?"同期キー":"PC・スマホで同期";
   $("dangerZone").hidden=!syncKey;
   $("footNote").textContent=syncKey?"暗号化して同期中":(fdb?"この端末にのみ保存中":"同期の設定がまだです(Firebase未設定)");
 }
@@ -547,57 +557,86 @@ function copyText(text,btn){
   else prompt("コピーしてください",text);
 }
 function shareLink(k){const inv=parseInvite(lsGet(INV_LS));return location.origin+location.pathname+"#k="+fmtKey(k)+(inv?"&i="+inv:"");}
+// 貼り付けた文字列（同期用リンク #k=… か、24文字の同期キー）からキーを取り出す
+function extractKey(str){
+  const s=String(str||"");
+  const m=/[#&]k=([^&#\s]+)/.exec(s);
+  let v=s;
+  if(m){try{v=decodeURIComponent(m[1]);}catch(e){v=m[1];}}
+  return parseKey(v);
+}
 function openSyncSheet(prefill){
   modalOpen=true;
+  let offArmed=false;
   const close=()=>{document.removeEventListener("keydown",onKey);$("modalRoot").innerHTML="";modalOpen=false;if(pendingRemote&&!dirty)applyRemote(pendingRemote);pendingRemote=null;};
   const onKey=e=>{if(e.key==="Escape")close();};
   document.addEventListener("keydown",onKey);
-  if(syncKey&&!prefill){
-    $("modalRoot").innerHTML=`<div class="overlay" id="ov"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="skT">
-      <h2 id="skT">同期キー</h2>
-      <p class="note">ほかの端末(スマホなど)で、このキーを入力するか、下のリンクを開くと同じ内容が表示されます。</p>
-      <div class="keybox" id="keyText">${fmtKey(syncKey)}</div>
-      <div class="copyrow"><button type="button" class="btn" id="cpKey">キーをコピー</button><button type="button" class="btn" id="cpLink">同期用リンクをコピー</button></div>
-      <p class="warn">このキーを持つ人は誰でも内容を読み書きできます。自分の端末以外には渡さないでください。なくすと誰にも復元できないので、メモ帳などに控えておいてください。</p>
-      <div class="actions"><div id="unlinkArea"><button type="button" class="btn ghost" id="unlinkBtn">この端末の同期を解除</button></div><div><button type="button" class="btn primary" id="closeBtn">閉じる</button></div></div>
-    </div></div>`;
-    $("cpKey").onclick=e=>copyText(fmtKey(syncKey),e.currentTarget);
-    $("cpLink").onclick=e=>copyText(shareLink(syncKey),e.currentTarget);
-    $("unlinkBtn").onclick=()=>{
-      $("unlinkArea").innerHTML=`<span class="confirm-del">この端末から内容を消して同期を解除します(クラウドと他の端末には残ります)。 <button type="button" class="btn danger" id="unYes">解除する</button></span>`;
-      $("unYes").onclick=()=>{unlink(true);close();toast("この端末の同期を解除しました");};
-    };
-  }else{
-    $("modalRoot").innerHTML=`<div class="overlay" id="ov"><form class="sheet" id="joinForm" role="dialog" aria-modal="true" aria-labelledby="skT">
-      <h2 id="skT">PC・スマホで同期する</h2>
-      <p class="note">ログインは不要です。最初の端末で同期キーを作り、ほかの端末でそのキーを入力します。内容は端末の中で暗号化され、運営者にも読めません。</p>
-      ${prefill?"":`<button type="button" class="btn primary" id="createBtn">新しく同期キーを作る(この端末の内容を保存)</button><div class="or">または</div>`}
-      <div class="field"><label for="joinKey">ほかの端末で作った同期キー</label><input id="joinKey" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" value="${prefill?fmtKey(prefill):""}"></div>
-      ${prefill&&syncKey?`<p class="warn">この端末は別の同期キーで同期中です。切り替えると、この端末の表示はリンクのキーの内容になります。</p>`:""}
-      <p class="note" id="joinMsg" role="status"></p>
-      <div class="actions"><div></div><div><button type="button" class="btn ghost" id="closeBtn">キャンセル</button><button type="submit" class="btn primary" id="joinBtn">このキーで同期</button></div></div>
-    </form></div>`;
-    const cb=$("createBtn");
-    if(cb)cb.onclick=async()=>{
-      cb.disabled=true;$("joinMsg").textContent="作成中…";
-      try{const k=newKey();await connect(k,"create");close();openSyncSheet();toast("同期キーを作りました");}
-      catch(e){cb.disabled=false;$("joinMsg").textContent="作成できませんでした。通信を確認してもう一度お試しください。";}
-    };
-    $("joinForm").addEventListener("submit",async e=>{
-      e.preventDefault();
-      const k=parseKey($("joinKey").value);
-      if(!k){$("joinMsg").textContent="同期キーは英数字24文字です(ハイフンは省略可)。";return;}
-      $("joinBtn").disabled=true;$("joinMsg").textContent="接続中…";
-      const prev=syncKey;
-      if(prev)unlink(false);
-      try{await connect(k,"join");close();toast("同期しました");}
-      catch(err){
-        $("joinBtn").disabled=false;
-        $("joinMsg").textContent=err.message==="notfound"?"このキーのデータは見つかりませんでした。キーを確認してください。":err.message==="decrypt"?"キーが正しくないため読み込めませんでした。":"接続できませんでした。通信を確認してください。";
-        if(prev)connect(prev,"resume").catch(()=>{});
-      }
-    });
+  $("modalRoot").innerHTML=`<div class="overlay" id="ov"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="skT">
+    <div class="sheet-head"><h2 id="skT">PC・スマホで同期</h2><button type="button" class="btn ghost" id="closeBtn">閉じる</button></div>
+    <p class="note" id="stState"></p>
+    <div id="stConnectBox">
+      <label for="stCode" class="note">招待コード（XXXX-XXXX）または同期用リンク。1台目は管理者から受け取った招待コード、2台目以降は1台目で「同期用リンクをコピー」したリンクを貼ります。</label>
+      <textarea id="stCode" class="codebox" rows="3" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+      <div class="copyrow" style="margin-top:8px"><button type="button" class="btn primary" id="stConnect">接続する</button></div>
+    </div>
+    <div class="copyrow" id="stConnected">
+      <button type="button" class="btn primary" id="stSyncNow">今すぐ同期</button>
+      <button type="button" class="btn" id="stShowCode">同期用リンクをコピー</button>
+      <button type="button" class="btn danger" id="stOff">接続を解除</button>
+    </div>
+    <textarea id="stCodeView" class="codebox" rows="3" readonly hidden aria-label="同期用リンク"></textarea>
+    <p class="note" id="stMsg" role="status"></p>
+    <p class="note">内容はこの端末で暗号化してから送ります。保存されるのは暗号文だけで、管理者にも読めません。そのため「同期用リンク」をなくすと、ほかの端末からデータを取り出せなくなります。控えを安全な場所に保管してください。人に見せたり、公開の場所に貼ったりしないでください。</p>
+  </div></div>`;
+  const msg=(t,err)=>{const m=$("stMsg");m.textContent=t;m.className="note "+(err?"msg-err":"msg-ok");};
+  const paint=()=>{
+    $("stState").textContent=syncKey
+      ?"接続済み：この端末の変更は暗号化して保存され、スマホとPCで共有されます。"
+      :"未接続：いまはこの端末の中だけに保存しています。招待コードか同期用リンクを貼ると、スマホとPCが同じ内容になります。";
+    $("stConnectBox").hidden=!!syncKey;
+    $("stConnected").hidden=!syncKey;
+    $("stCodeView").hidden=true;
+    $("stOff").textContent="接続を解除";offArmed=false;
+  };
+  paint();
+  if(prefill){
+    if(syncKey)msg("この端末はすでに接続済みです。別のリンクに切り替えるときは、いったん「接続を解除」してください。",true);
+    else{$("stCode").value=prefill;msg("同期用リンクを読み込みました。「接続する」を押してください。");}
   }
+  $("stConnect").onclick=async()=>{
+    const v=$("stCode").value, k=extractKey(v), code=k?null:parseInvite(v), inv=parseInvite(lsGet(INV_LS));
+    if(!k&&!code){msg("招待コードか同期用リンクを読み取れませんでした。招待コードは英数字8文字（XXXX-XXXX）です。リンクはすべて貼り付けてください。",true);return;}
+    if(code&&inv&&code!==inv){msg("この端末で使っている招待コードと違います。管理者から受け取ったコードを確かめてください。",true);return;}
+    $("stConnect").disabled=true;msg("接続を確認しています…");
+    try{
+      // 招待コード＝1台目として新しく始める。同期用リンク＝1台目の内容につなぐ
+      if(k)await connect(k,"join");else await connect(newKey(),"create");
+      $("stCode").value="";paint();
+      msg("接続しました。ほかの端末では、この画面の「同期用リンクをコピー」で出るリンクを開くか貼ってください。");
+    }catch(err){
+      msg(err&&err.message==="notfound"?"このリンクのデータは見つかりませんでした。1台目の「同期用リンク」を貼り直してください。"
+        :err&&err.message==="decrypt"?"暗号の鍵が一致しません。1台目の「同期用リンク」を貼り直してください。"
+        :err&&err.code==="permission-denied"?"この端末は利用の許可を確認できませんでした。招待コードを入れ直してください。"
+        :"同期先につながりませんでした。インターネット接続を確認してください。",true);
+    }
+    $("stConnect").disabled=false;
+  };
+  $("stSyncNow").onclick=()=>{
+    if(!docRef)return;
+    dirty=true;flush();
+    msg(navigator.onLine?"同期しました（変更はふだんから自動で保存・受信されます）。":"オフラインです。つながると自動で送ります。",!navigator.onLine);
+  };
+  $("stShowCode").onclick=()=>{
+    const box=$("stCodeView");
+    box.value=shareLink(syncKey);box.hidden=false;box.focus();box.select();
+    const ok=()=>msg("同期用リンクをコピーしました。ほかの端末で開くか、この画面の入力欄に貼ってください（ホーム画面のアプリでは貼り付け）。鍵の控えにもなるので、安全な場所に保存してください。");
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(box.value).then(ok,()=>msg("表示されたリンクを選択してコピーしてください。"));
+    else msg("表示されたリンクを選択してコピーしてください。");
+  };
+  $("stOff").onclick=()=>{
+    if(!offArmed){offArmed=true;$("stOff").textContent="もう一度で解除";setTimeout(()=>{offArmed=false;const b=$("stOff");if(b)b.textContent="接続を解除";},4000);return;}
+    unlink(false);paint();msg("接続を解除しました。データはこの端末に残っています。");
+  };
   $("ov").addEventListener("click",e=>{if(e.target.id==="ov")close();});
   $("closeBtn").onclick=close;
 }
