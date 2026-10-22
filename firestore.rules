@@ -36,13 +36,14 @@ service cloud.firestore {
     }
 
     // 端末の登録票:本人の分だけ。招待コードへの端末登録と同時(同じ書き込み)でなければ作れない。
-    // dn は端末の種類(iPhone・Windows など。管理画面の表示用、16文字まで)
+    // dn は端末の種類と使っている場所(iPhone(ホーム画面) など。管理画面の表示用、16文字まで)。last は最終利用(サーバーの時刻)
     match /members/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid
                  && deviceAllowed(get(invitePath(resource.data.code)).data);
       allow create, update: if request.auth != null
                             && request.auth.uid == uid
-                            && request.resource.data.keys().hasOnly(['code', 'dn'])
+                            && request.resource.data.keys().hasOnly(['code', 'dn', 'last'])
+                            && (!('last' in request.resource.data) || request.resource.data.last == request.time)
                             && (!('dn' in request.resource.data) || (request.resource.data.dn is string && request.resource.data.dn.size() <= 16))
                             && request.resource.data.code is string
                             && request.resource.data.code.size() == 9

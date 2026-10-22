@@ -205,8 +205,8 @@ function render(){
     </div></td></tr>`;
     if(openKey!==d.key)return main;
     const list=d.devices.length?`<ul class="devlist">${d.devices.map((v,i)=>`<li>
-      <span class="dn">端末${i+1}${v.name?"（"+esc(v.name)+"）":""}</span>
-      <span class="date">${esc(v.time)} に登録</span>
+      <span class="dn">端末${i+1}${v.name?"："+esc(v.name):""}</span>
+      <span class="date">${esc(v.time)} に登録</span>${v.last?`<span class="date">最終利用 ${esc(v.last)}</span>`:""}
       ${v.blocked?`<span class="blocked">止めています</span>`:""}
       <span class="acts" data-key="${esc(d.key)}" data-dev="${esc(v.id)}">
         <button class="btn small danger" type="button" data-act="rmdev">この端末を取り消す</button>
@@ -218,7 +218,7 @@ function render(){
           ${d.devices.length?`<button class="btn small danger" type="button" data-act="rmall">すべての端末登録を取り消す</button>`:""}
           <button class="btn small danger" type="button" data-act="reissue">コードを作り直す</button>
         </div>
-        <p class="note">「取り消す」：その端末の登録を外します。本人がもう一度使うと、空きがあれば登録し直せます。${gas?"「止める」：その端末は二度と使えなくなります（なくした端末向け）。":""}「コードを作り直す」：新しいコードに替え、登録端末も空にします（コードが漏れたとき）。データは残るので、本人には新しいコードで、つなぎ直してもらいます。</p></div>
+        <p class="note">同じスマホでも、ホーム画面のアプリとブラウザ（Safari など）は別の端末として数えられます。最終利用が古い端末は取り消して構いません。「取り消す」：その端末の登録を外します。本人がもう一度使うと、空きがあれば登録し直せます。${gas?"「止める」：その端末は二度と使えなくなります（なくした端末向け）。":""}「コードを作り直す」：新しいコードに替え、登録端末も空にします（コードが漏れたとき）。データは残るので、本人には新しいコードで、つなぎ直してもらいます。</p></div>
       <div class="field"><label for="max-${esc(d.key)}">使える端末の台数</label><div class="acts" data-key="${esc(d.key)}"><input id="max-${esc(d.key)}" type="number" min="1" max="20" value="${d.max}" inputmode="numeric"><button class="btn small" type="button" data-act="setmax">変更</button></div></div>
     </div></td></tr>`;
   }).join(""):`<tr><td colspan="7" class="note">まだ招待コードがありません。上のフォームから発行してください。</td></tr>`;

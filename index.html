@@ -82,6 +82,7 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-a
 .sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .sheet-head h2{margin:0}
 .note.msg-ok{color:var(--check)}
+.note.gate-home{color:var(--danger);font-weight:700}
 .note.msg-err{color:var(--danger)}
 .linkbtn{border:0;background:none;color:var(--accent);font-size:12px;padding:2px 4px;text-decoration:underline}
 .privacy{font-size:12px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
@@ -278,6 +279,7 @@ window.FIREBASE_CONFIG = {
   <form class="gate-card" id="gateForm">
     <div class="title-box"><h1>タイムバケット</h1></div>
     <p>このアプリは招待された方だけが使えます。管理者から受け取った招待コードを入力してください。</p>
+    <p class="note gate-home" id="gateHome" hidden>スマホでは、ブラウザの共有ボタン →「ホーム画面に追加」をしてから、ホーム画面のアイコンで開いて入力してください。ブラウザとホーム画面のアプリは別の端末として数えられ、使える台数の枠を余分に使ってしまいます。</p>
     <div class="field"><label for="gateCode">招待コード</label><input id="gateCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX"></div>
     <p class="note" id="gateMsg" role="status"></p>
     <button class="btn primary" type="submit" id="gateBtn">はじめる</button>
@@ -468,7 +470,7 @@ function parseInvite(str){
 }
 let gateNext=null;
 function showGate(msg,prefill){
-  $("gate").hidden=false;$("gateMsg").textContent=msg||"";
+  $("gate").hidden=false;$("gateHome").hidden=!mobileBrowser();$("gateMsg").textContent=msg||"";
   if(prefill)$("gateCode").value=prefill;
   $("gateBtn").disabled=false;
 }
@@ -481,22 +483,29 @@ function lockApp(){
   showGate("利用の許可を確認できませんでした。招待コードを入力してください。",parseInvite(lsGet(INV_LS)));
 }
 // 端末の種類（管理画面で見分けるための表示用。中身とは関係ない）
+// ホーム画面に追加したアプリとして開いているか
+function standalone(){return navigator.standalone===true||!!(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches);}
+function mobileBrowser(){const ua=navigator.userAgent||"";return (/iPhone|iPad|Android/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1))&&!standalone();}
+// 端末の種類と使っている場所（同じ iPhone でも、ホーム画面のアプリとブラウザは別の端末として数えられるので見分けるため）
 function devName(){
-  const ua=navigator.userAgent||"";
-  if(/iPhone/.test(ua))return "iPhone";
-  if(/iPad/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1))return "iPad";
-  if(/Android/.test(ua))return "Android";
-  if(/Windows/.test(ua))return "Windows";
-  if(/Macintosh/.test(ua))return "Mac";
-  return "その他";
+  const ua=navigator.userAgent||"";let k="その他";
+  if(/iPhone/.test(ua))k="iPhone";
+  else if(/iPad/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1))k="iPad";
+  else if(/Android/.test(ua))k="Android";
+  else if(/Windows/.test(ua))k="Windows";
+  else if(/Macintosh/.test(ua))k="Mac";
+  if(/^(iPhone|iPad|Android)$/.test(k))k+=standalone()?"（ホーム画面）":"（ブラウザ）";
+  return k;
 }
 async function checkMember(){
   const u=await ensureAuth();
   try{
     const snap=await fdb.collection("members").doc(u.uid).get();
-    // 以前に登録した端末は、端末の種類をあとから書き足す
+    // 端末の種類と最終利用を書く（書き込みを減らすため、種類が変わったときか1時間に1回まで）
     const d=snap.exists?snap.data():null;
-    if(d&&d.code&&!d.dn)snap.ref.set({code:d.code,dn:devName()}).catch(()=>{});
+    const lastMs=d&&d.last&&d.last.toMillis?d.last.toMillis():0;
+    if(d&&d.code&&(d.dn!==devName()||Date.now()-lastMs>3600000))
+      snap.ref.set({code:d.code,dn:devName(),last:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
     return "ok";
   }
   catch(e){return e&&e.code==="permission-denied"?"denied":"offline";}
@@ -512,7 +521,7 @@ $("gateForm").addEventListener("submit",async e=>{
     // 招待コードにこの端末を登録(上限台数はルール側で確認)し、同時に端末の登録票を作る
     const batch=fdb.batch();
     batch.update(fdb.collection("invites").doc(code),{["devices."+u.uid]:firebase.firestore.FieldValue.serverTimestamp()});
-    batch.set(fdb.collection("members").doc(u.uid),{code,dn:devName()});
+    batch.set(fdb.collection("members").doc(u.uid),{code,dn:devName(),last:firebase.firestore.FieldValue.serverTimestamp()});
     await batch.commit();
     if(await checkMember()!=="ok")throw {code:"permission-denied"};
     lsSet(INV_LS,code);lsSet(MEM_LS,"1");hideGate();toast("ようこそ");
