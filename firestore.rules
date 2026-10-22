@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 管理者(招待コードを発行・停止できる人)。admin.html で Google ログインした本人だけ。
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'skrht0326@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    function invitePath(code) {
+      return /databases/$(database)/documents/invites/$(code);
+    }
+    // 招待コードが有効で、この端末が登録済み(取り消されていない)か
+    function deviceAllowed(inv) {
+      return inv.active == true && request.auth.uid in inv.get('devices', {});
+    }
+    function isMember() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/members/$(request.auth.uid))
+        && deviceAllowed(get(invitePath(get(/databases/$(database)/documents/members/$(request.auth.uid)).data.code)).data);
+    }
+
+    // 招待コード:管理者は読み書き自由。
+    // 利用者は「自分の端末を devices に追加する」更新だけ、上限台数以内でできる(他の項目・他の端末は変更不可)。
+    match /invites/{code} {
+      allow read, create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        request.auth != null
+        && resource.data.active == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
+        && request.resource.data.devices.diff(resource.data.get('devices', {})).affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.devices[request.auth.uid] == request.time
+        && request.resource.data.devices.size() <= resource.data.get('maxDevices', 3)
+      );
+    }
+
+    // 端末の登録票:本人の分だけ。招待コードへの端末登録と同時(同じ書き込み)でなければ作れない。
+    // dn は端末の種類(iPhone・Windows など。管理画面の表示用、16文字まで)
+    match /members/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid
+                 && deviceAllowed(get(invitePath(resource.data.code)).data);
+      allow create, update: if request.auth != null
+                            && request.auth.uid == uid
+                            && request.resource.data.keys().hasOnly(['code', 'dn'])
+                            && (!('dn' in request.resource.data) || (request.resource.data.dn is string && request.resource.data.dn.size() <= 16))
+                            && request.resource.data.code is string
+                            && request.resource.data.code.size() == 9
+                            && deviceAllowed(getAfter(invitePath(request.resource.data.code)).data);
+      allow list, delete: if false;
+    }
+
+    // 暗号化データ:登録済みの端末だけ。文書IDは同期キーから端末内で計算され、一覧取得は禁止。
+    match /vaults/{vid} {
+      allow get: if isMember();
+      allow list: if false;
+      allow create, update: if isMember()
+                            && vid.matches('^[0-9a-f]{64}$')
+                            && request.resource.data.keys().hasOnly(['v', 'iv', 'ct'])
+                            && request.resource.data.iv is string
+                            && request.resource.data.ct is string
+                            && request.resource.data.ct.size() < 900000;
+      allow delete: if isMember();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

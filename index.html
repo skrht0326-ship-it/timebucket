@@ -480,9 +480,25 @@ function lockApp(){
   setSync("err","利用の確認が必要です");
   showGate("利用の許可を確認できませんでした。招待コードを入力してください。",parseInvite(lsGet(INV_LS)));
 }
+// 端末の種類（管理画面で見分けるための表示用。中身とは関係ない）
+function devName(){
+  const ua=navigator.userAgent||"";
+  if(/iPhone/.test(ua))return "iPhone";
+  if(/iPad/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1))return "iPad";
+  if(/Android/.test(ua))return "Android";
+  if(/Windows/.test(ua))return "Windows";
+  if(/Macintosh/.test(ua))return "Mac";
+  return "その他";
+}
 async function checkMember(){
   const u=await ensureAuth();
-  try{await fdb.collection("members").doc(u.uid).get();return "ok";}
+  try{
+    const snap=await fdb.collection("members").doc(u.uid).get();
+    // 以前に登録した端末は、端末の種類をあとから書き足す
+    const d=snap.exists?snap.data():null;
+    if(d&&d.code&&!d.dn)snap.ref.set({code:d.code,dn:devName()}).catch(()=>{});
+    return "ok";
+  }
   catch(e){return e&&e.code==="permission-denied"?"denied":"offline";}
 }
 $("gateForm").addEventListener("submit",async e=>{
@@ -496,7 +512,7 @@ $("gateForm").addEventListener("submit",async e=>{
     // 招待コードにこの端末を登録(上限台数はルール側で確認)し、同時に端末の登録票を作る
     const batch=fdb.batch();
     batch.update(fdb.collection("invites").doc(code),{["devices."+u.uid]:firebase.firestore.FieldValue.serverTimestamp()});
-    batch.set(fdb.collection("members").doc(u.uid),{code});
+    batch.set(fdb.collection("members").doc(u.uid),{code,dn:devName()});
     await batch.commit();
     if(await checkMember()!=="ok")throw {code:"permission-denied"};
     lsSet(INV_LS,code);lsSet(MEM_LS,"1");hideGate();toast("ようこそ");
