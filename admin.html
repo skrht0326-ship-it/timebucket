@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-/* Layout: 1列の管理画面。上に発行フォーム、下に招待コードの表(状態を札で表示) */
+/* Layout: 上にアプリの切り替えタブ。その下に発行フォーム、招待コードの表（状態を札で表示）。3アプリとも同じ見た目・同じ操作。中身は共通スプレッドシート「アプリ_許可リスト」 */
 :root{
   --bg:#f7f8fa; --surface:#ffffff; --surface-2:#f0f2f5; --line:#d4d9e0;
   --ink:#1c1f24; --ink-2:#555c66; --ink-3:#8a919b;
@@ -32,7 +32,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;font-weight:500}
 [hidden]{display:none!important}
-.wrap{max-width:900px;margin:0 auto;padding-block:20px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+.wrap{max-width:960px;margin:0 auto;padding-block:20px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
 button,input{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -40,6 +40,9 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;justify-cont
 .title-box{background:var(--title-bg);border:1.5px solid var(--title-line);border-radius:12px;padding:8px 26px}
 .title-box h1{margin:0;font-size:22px;font-weight:900;letter-spacing:.1em}
 .acct{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tab{border:1px solid var(--line);border-bottom:none;background:var(--surface-2);border-radius:10px 10px 0 0;padding:8px 18px;font-weight:700;color:var(--ink-2);margin-bottom:-1px}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:inset 0 3px 0 var(--accent)}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
 .card h2{margin:0;font-size:16px;font-weight:900}
 .note{margin:0;font-size:13px;color:var(--ink-2)}
@@ -51,8 +54,9 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;justify-cont
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
 .btn.small{padding:3px 10px;font-size:12.5px}
 .btn.danger{color:var(--danger);background:var(--danger-soft);border-color:var(--danger-soft)}
+.btn:disabled{opacity:.5;cursor:default}
 .tablebox{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14px;min-width:620px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:700px}
 th{text-align:left;font-size:12px;color:var(--ink-2);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line)}
 td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .code{font-family:var(--f-mono);font-weight:600;letter-spacing:.06em;white-space:nowrap}
@@ -60,22 +64,23 @@ td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:1px 10px;white-space:nowrap}
 .pill.on{background:var(--ok-soft);color:var(--ok)}
 .pill.off{background:var(--off-soft);color:var(--off)}
+td.memo{min-width:8em}
 tr.inactive .code,tr.inactive .memo{color:var(--ink-3)}
-.acts{display:flex;gap:6px;flex-wrap:wrap}
+.acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px}
-.msg{font-size:14px;color:var(--danger)}
+.msg{font-size:14px;color:var(--danger);margin:0}
 .devcount{font-family:var(--f-mono);font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
 .devcount.full{color:var(--danger)}
 tr.detail td{background:var(--surface-2)}
 .devlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .devlist li{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13.5px}
-.devlist .dn{font-weight:700;min-width:4em}
+.devlist .dn{font-weight:700;min-width:5em}
+.devlist .blocked{color:var(--danger);font-weight:700}
 .detail-row{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-start}
 .detail-row .field input{width:80px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -84,13 +89,14 @@ tr.detail td{background:var(--surface-2)}
     <div class="acct"><span id="who"></span><button class="btn" id="loginBtn" type="button">管理者としてGoogleでログイン</button><button class="btn" id="logoutBtn" type="button" hidden>ログアウト</button></div>
   </header>
 
-  <p class="note">タイムバケットを使える人を管理します。1人に1つコードを発行して渡してください。「停止」にすると、そのコードで登録したすべての端末で同期が使えなくなります。利用者が書いた内容は暗号化されているため、ここからは見えません。</p>
+  <div class="tabs" role="tablist" aria-label="アプリの切り替え" id="tabs"></div>
+  <p class="note" id="appNote"></p>
   <p class="msg" id="msg" role="status"></p>
 
   <section class="card" id="issueCard" hidden>
     <h2>招待コードを発行</h2>
     <div class="row">
-      <div class="field" style="flex:1 1 240px"><label for="memo">誰に渡すか(メモ・管理者だけが見られます)</label><input id="memo" maxlength="60" placeholder="例:田中さん"></div>
+      <div class="field" style="flex:1 1 240px"><label for="memo">誰に渡すか（メモ・管理者だけが見られます）</label><input id="memo" maxlength="60" placeholder="例：田中さん"></div>
       <div class="field" style="width:90px"><label for="count">数</label><input id="count" type="number" min="1" max="20" value="1" inputmode="numeric"></div>
       <div class="field" style="width:120px"><label for="maxDev">使える端末の台数</label><input id="maxDev" type="number" min="1" max="20" value="3" inputmode="numeric"></div>
       <button class="btn primary" id="issueBtn" type="button">発行する</button>
@@ -100,7 +106,7 @@ tr.detail td{background:var(--surface-2)}
   <section class="card" id="listCard" hidden>
     <h2>発行済みの招待コード <span class="note" id="countNote"></span></h2>
     <div class="tablebox"><table>
-      <thead><tr><th>コード</th><th>メモ</th><th>状態</th><th>登録端末</th><th>発行日</th><th>操作</th></tr></thead>
+      <thead><tr><th>コード</th><th>メモ</th><th>状態</th><th>登録端末</th><th>発行日</th><th>最終利用</th><th>操作</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
   </section>
@@ -117,106 +123,156 @@ const FIREBASE_CONFIG={
   messagingSenderId:"101966198709",
   appId:"1:101966198709:web:ad437fd2cdf5d4e5d1cbfc"
 };
-const ALPH="0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+// 試験時だけ（localhost で ?sync=）、マンダラ・マインドマップを試験用サーバーにつなぐ
+const TEST_SYNC=/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?new URLSearchParams(location.search).get("sync"):null;
+const APPS={
+  timebucket:{label:"タイムバケット",url:TEST_SYNC||"https://script.google.com/macros/s/AKfycbwAerlR-F4emaaXjS8RRCJazsDTlpOcBS91N4PpqOE4We6RVPZvd8rGRjoS6qciZmdA-A/exec",appUrl:"https://skrht0326-ship-it.github.io/timebucket/",linkParam:"i",tab:"タイムバケット",blocks:false},
+  mandala:{label:"マンダラチャート帳",kind:"gas",url:TEST_SYNC||"https://script.google.com/macros/s/AKfycbxbOoeKnztltqPPX7665SqVyisV1pRUr3hz6oSY-OFQs-c6X2GzcqoJDKQhbNy609m7Ug/exec",appUrl:"https://skrht0326-ship-it.github.io/mandala/",linkParam:"c",tab:"マンダラ",blocks:true},
+  mindmap:{label:"マインドマップ帳",kind:"gas",url:TEST_SYNC||"https://script.google.com/macros/s/AKfycbwB8B-2mPamqNtLaqPuYqSFbuSlhtGTmcPVGooh9xOUGvQJtYLJmLyQPp_vSzqdUMpsqQ/exec",appUrl:"https://skrht0326-ship-it.github.io/mindmap/",linkParam:"c",tab:"マインドマップ",blocks:true}
+};
+const NOTE="を使える人を管理します。1人に1つコードを発行して渡してください。「停止」にすると、そのコードで登録したすべての端末で同期が使えなくなります。利用者が書いた内容は暗号化されているため、ここからは見えません。";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let toastT;function toast(m){$("toastRoot").innerHTML=`<div class="toast" role="status">${esc(m)}</div>`;clearTimeout(toastT);toastT=setTimeout(()=>$("toastRoot").innerHTML="",1800);}
-function newCode(){const r=crypto.getRandomValues(new Uint8Array(8));let k="";r.forEach(b=>k+=ALPH[b&31]);return k.slice(0,4)+"-"+k.slice(4);}
-const appUrl=new URL("./",location.href).href;
-const inviteLink=c=>appUrl+"#i="+c;
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 
-// アプリ本体(匿名ログイン)と混ざらないよう、別名のアプリとして初期化する
+// アプリ本体（匿名ログイン）と混ざらないよう、別名のアプリとして初期化する
 const app=firebase.initializeApp(FIREBASE_CONFIG,"admin");
-const auth=app.auth(), db=app.firestore();
-let unsub=null, docs=[];
+const auth=app.auth();
+let user=null, cur=lsGet("admin.tab")||"timebucket", items=[], openKey=null;
+if(!APPS[cur])cur="timebucket";
 
-$("loginBtn").onclick=()=>{
-  const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
-  auth.signInWithPopup(p).catch(e=>{
-    if(e&&(e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment"))auth.signInWithRedirect(p);
-    else if(!(e&&/popup-closed|cancelled-popup/.test(e.code)))$("msg").textContent="ログインできませんでした("+(e&&e.code||"")+")";
-  });
+/* ---------- 表示のための共通の形：{key, code, memo, active, max, devices:[{id,name,time,blocked}], created, last} ---------- */
+function fromGas(r){return {key:r.sid,code:r.code,memo:r.memo,active:r.active,max:r.max,devices:r.devices||[],created:(r.created||"").slice(0,10),last:r.last||""};}
+
+/* ---------- 3アプリとも Apps Script 経由（共通スプレッドシートを読み書き。タイムバケットは Firebase にも写る） ---------- */
+async function gasCall(a,body){
+  const idToken=TEST_SYNC?"mock-admin":await user.getIdToken();
+  const r=await fetch(a.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({admin:Object.assign({idToken},body)}),redirect:"follow"});
+  const j=await r.json();
+  if(!j||!j.ok)throw new Error((j&&j.error)||"server");
+  return j.items||[];
+}
+const GAS={
+  async load(){
+    const a=APPS[cur], want=cur;
+    try{const list=await gasCall(a,{op:"list"});if(cur!==want)return;items=list.map(fromGas);showLists();render();}
+    catch(e){if(cur!==want)return;$("msg").textContent=e.message==="not_admin"?"このアカウントには管理者の権限がありません。":"読み込めませんでした。再読み込みしてください。";}
+  },
+  async act(op,it,x){
+    const a=APPS[cur];
+    const body=Object.assign({op},it?{sid:it.key}:{},x||{});
+    if(op==="toggle")body.active=!it.active;
+    const list=await gasCall(a,body);
+    items=list.map(fromGas);render();
+  }
 };
-$("logoutBtn").onclick=()=>auth.signOut();
-auth.getRedirectResult().catch(()=>{});
+const back=()=>GAS;
 
-auth.onAuthStateChanged(u=>{
-  if(unsub){unsub();unsub=null;}
-  $("loginBtn").hidden=!!u;$("logoutBtn").hidden=!u;$("who").textContent=u?(u.email||""):"";
-  $("issueCard").hidden=$("listCard").hidden=true;$("msg").textContent="";
-  if(!u)return;
-  unsub=db.collection("invites").orderBy("created","desc").onSnapshot(snap=>{
-    docs=snap.docs.map(d=>({id:d.id,...d.data()}));
-    $("issueCard").hidden=$("listCard").hidden=false;render();
-  },e=>{
-    $("msg").textContent=e&&e.code==="permission-denied"?"このアカウントには管理者の権限がありません。":"読み込めませんでした。再読み込みしてください。";
-  });
-});
-
-function fmtDate(t,withTime){if(!t||!t.toDate)return "";const d=t.toDate();const p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())}`+(withTime?` ${p(d.getHours())}:${p(d.getMinutes())}`:"");}
-const maxOf=d=>Number.isFinite(d.maxDevices)?d.maxDevices:3;
-const devsOf=d=>Object.entries(d.devices||{}).sort((a,b)=>((a[1]&&a[1].seconds)||0)-((b[1]&&b[1].seconds)||0));
-let openId=null;
+/* ---------- 画面 ---------- */
+function renderTabs(){
+  $("tabs").innerHTML=Object.keys(APPS).map(k=>`<button type="button" class="tab" role="tab" data-app="${k}" aria-selected="${k===cur}">${esc(APPS[k].label)}</button>`).join("");
+  $("appNote").textContent=APPS[cur].label+NOTE+"（ここでの変更は、スプレッドシート「アプリ_許可リスト」の「"+APPS[cur].tab+"」シートと同じものです。どちらで直しても構いません）";
+}
+function showLists(){$("issueCard").hidden=$("listCard").hidden=false;$("msg").textContent="";}
+function hideLists(){$("issueCard").hidden=$("listCard").hidden=true;}
+function switchTo(k){
+  cur=k;lsSet("admin.tab",k);items=[];openKey=null;
+  renderTabs();hideLists();$("msg").textContent="";$("rows").innerHTML="";
+  if(!user&&!TEST_SYNC)return;
+  $("msg").textContent="読み込み中…";$("msg").style.color="var(--ink-2)";
+  back().load().then(()=>{$("msg").style.color="";});
+}
 function render(){
-  const on=docs.filter(d=>d.active).length;
-  $("countNote").textContent=`(有効 ${on} / 全 ${docs.length})`;
-  $("rows").innerHTML=docs.length?docs.map(d=>{
-    const devs=devsOf(d), max=maxOf(d), full=devs.length>=max;
+  const a=APPS[cur], gas=!!a.blocks;
+  const on=items.filter(d=>d.active).length;
+  $("countNote").textContent=`（有効 ${on} / 全 ${items.length}）`;
+  $("rows").innerHTML=items.length?items.map(d=>{
+    const live=d.devices.filter(x=>!x.blocked), full=live.length>=d.max;
     const main=`<tr class="${d.active?"":"inactive"}">
-    <td class="code">${esc(d.id)}</td>
-    <td class="memo">${esc(d.memo||"")}</td>
+    <td class="code">${esc(d.code)}</td>
+    <td class="memo">${esc(d.memo)}</td>
     <td><span class="pill ${d.active?"on":"off"}">${d.active?"有効":"停止中"}</span></td>
-    <td><span class="devcount${full?" full":""}">${devs.length} / ${max}台</span></td>
-    <td class="date">${fmtDate(d.created)}</td>
-    <td><div class="acts" data-id="${esc(d.id)}">
+    <td><span class="devcount${full?" full":""}">${live.length} / ${d.max}台</span></td>
+    <td class="date">${esc(d.created)}</td>
+    <td class="date">${esc(d.last||"—")}</td>
+    <td><div class="acts" data-key="${esc(d.key)}">
       <button class="btn small" type="button" data-act="link">招待リンクをコピー</button>
-      <button class="btn small" type="button" data-act="detail" aria-expanded="${openId===d.id}">端末</button>
+      <button class="btn small" type="button" data-act="detail" aria-expanded="${openKey===d.key}">端末</button>
       <button class="btn small" type="button" data-act="toggle">${d.active?"停止":"再開"}</button>
       <button class="btn small danger" type="button" data-act="del">削除</button>
     </div></td></tr>`;
-    if(openId!==d.id)return main;
-    const list=devs.length?`<ul class="devlist">${devs.map(([uid,t],i)=>`<li><span class="dn">端末${i+1}</span><span class="date">${fmtDate(t,true)||"登録中"} に登録</span><span class="acts" data-id="${esc(d.id)}" data-uid="${esc(uid)}"><button class="btn small danger" type="button" data-act="rmdev">この端末を取り消す</button></span></li>`).join("")}</ul>`:`<p class="note">まだ登録された端末はありません。</p>`;
-    return main+`<tr class="detail"><td colspan="6"><div class="detail-row">
-      <div style="flex:1 1 280px;display:flex;flex-direction:column;gap:8px">${list}
-        ${devs.length?`<div class="acts" data-id="${esc(d.id)}"><button class="btn small danger" type="button" data-act="rmall">すべての端末登録を取り消す</button></div>`:""}
-        <p class="note">取り消した端末は次の操作から使えなくなり、招待コードの画面に戻ります。本人が再びコードを入れると、空きがあれば登録し直せます。他人に渡されていそうなときは、すべて取り消して本人に新しいコードを渡してください。</p></div>
-      <div class="field"><label for="max-${esc(d.id)}">使える端末の台数</label><div class="acts" data-id="${esc(d.id)}"><input id="max-${esc(d.id)}" type="number" min="1" max="20" value="${max}" inputmode="numeric"><button class="btn small" type="button" data-act="setmax">変更</button></div></div>
+    if(openKey!==d.key)return main;
+    const list=d.devices.length?`<ul class="devlist">${d.devices.map((v,i)=>`<li>
+      <span class="dn">端末${i+1}${v.name?"（"+esc(v.name)+"）":""}</span>
+      <span class="date">${esc(v.time)} に登録</span>
+      ${v.blocked?`<span class="blocked">止めています</span>`:""}
+      <span class="acts" data-key="${esc(d.key)}" data-dev="${esc(v.id)}">
+        <button class="btn small danger" type="button" data-act="rmdev">この端末を取り消す</button>
+        ${gas?(v.blocked?`<button class="btn small" type="button" data-act="unblock">止めを解除</button>`:`<button class="btn small danger" type="button" data-act="block">この端末を止める</button>`):""}
+      </span></li>`).join("")}</ul>`:`<p class="note">まだ登録された端末はありません。</p>`;
+    return main+`<tr class="detail"><td colspan="7"><div class="detail-row">
+      <div style="flex:1 1 300px;display:flex;flex-direction:column;gap:8px">${list}
+        <div class="acts" data-key="${esc(d.key)}">
+          ${d.devices.length?`<button class="btn small danger" type="button" data-act="rmall">すべての端末登録を取り消す</button>`:""}
+          <button class="btn small danger" type="button" data-act="reissue">コードを作り直す</button>
+        </div>
+        <p class="note">「取り消す」：その端末の登録を外します。本人がもう一度使うと、空きがあれば登録し直せます。${gas?"「止める」：その端末は二度と使えなくなります（なくした端末向け）。":""}「コードを作り直す」：新しいコードに替え、登録端末も空にします（コードが漏れたとき）。データは残るので、本人には新しいコードで、つなぎ直してもらいます。</p></div>
+      <div class="field"><label for="max-${esc(d.key)}">使える端末の台数</label><div class="acts" data-key="${esc(d.key)}"><input id="max-${esc(d.key)}" type="number" min="1" max="20" value="${d.max}" inputmode="numeric"><button class="btn small" type="button" data-act="setmax">変更</button></div></div>
     </div></td></tr>`;
-  }).join(""):`<tr><td colspan="6" class="note">まだ招待コードがありません。上のフォームから発行してください。</td></tr>`;
+  }).join(""):`<tr><td colspan="7" class="note">まだ招待コードがありません。上のフォームから発行してください。</td></tr>`;
 }
 function copy(text,btn){
   const done=()=>{const o=btn.textContent;btn.textContent="コピーしました";setTimeout(()=>btn.textContent=o,1500);};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(done).catch(()=>prompt("コピーしてください",text));
   else prompt("コピーしてください",text);
 }
+const DONE={toggle:"変更しました",setmax:"台数を変更しました",rmdev:"端末の登録を取り消しました",rmall:"すべての端末登録を取り消しました",block:"この端末を止めました",unblock:"止めを解除しました",del:"削除しました",reissue:"コードを作り直しました"};
+const ASK={rmdev:"本当に取り消す",rmall:"本当にすべて取り消す",block:"本当に止める",del:"本当に削除",reissue:"本当に作り直す"};
+
+$("tabs").addEventListener("click",e=>{const t=e.target.closest("[data-app]");if(t&&t.dataset.app!==cur)switchTo(t.dataset.app);});
 $("rows").addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;
-  const id=b.parentElement.dataset.id, d=docs.find(x=>x.id===id);if(!d)return;
-  const act=b.dataset.act, ref=db.collection("invites").doc(id);
-  const confirm2=label=>{if(b.dataset.confirm==="1")return true;b.dataset.confirm="1";const o=b.textContent;b.textContent=label;setTimeout(()=>{if(b.isConnected){b.dataset.confirm="";b.textContent=o;}},4000);return false;};
-  if(act==="link")copy(inviteLink(id),b);
-  else if(act==="detail"){openId=openId===id?null:id;render();}
-  else if(act==="rmdev"){if(!confirm2("本当に取り消す"))return;const uid=b.parentElement.dataset.uid;try{await ref.update({["devices."+uid]:firebase.firestore.FieldValue.delete()});toast("端末の登録を取り消しました");}catch(err){toast("取り消せませんでした");}}
-  else if(act==="rmall"){if(!confirm2("本当にすべて取り消す"))return;try{await ref.update({devices:{}});toast("すべての端末登録を取り消しました");}catch(err){toast("取り消せませんでした");}}
-  else if(act==="setmax"){const n=parseInt($("max-"+id).value,10);if(!(n>=1&&n<=20)){toast("1〜20台で指定してください");return;}try{await ref.update({maxDevices:n});toast(`${n}台に変更しました`);}catch(err){toast("変更できませんでした");}}
-  else if(act==="toggle"){b.disabled=true;try{await db.collection("invites").doc(id).update({active:!d.active});toast(d.active?"停止しました":"再開しました");}catch(err){toast("変更できませんでした");b.disabled=false;}}
-  else if(act==="del"){
-    if(b.dataset.confirm!=="1"){b.dataset.confirm="1";b.textContent="本当に削除";setTimeout(()=>{if(b.isConnected){b.dataset.confirm="";b.textContent="削除";}},4000);return;}
-    try{await ref.delete();if(openId===id)openId=null;toast("削除しました");}catch(err){toast("削除できませんでした");}
+  const box=b.parentElement, d=items.find(x=>x.key===box.dataset.key);if(!d)return;
+  const act=b.dataset.act;
+  if(act==="link"){copy(APPS[cur].appUrl+"#"+APPS[cur].linkParam+"="+d.code,b);return;}
+  if(act==="detail"){openKey=openKey===d.key?null:d.key;render();return;}
+  if(ASK[act]&&b.dataset.confirm!=="1"){
+    b.dataset.confirm="1";const o=b.textContent;b.textContent=ASK[act];
+    setTimeout(()=>{if(b.isConnected){b.dataset.confirm="";b.textContent=o;}},4000);return;
   }
+  const x={};
+  if(box.dataset.dev)x.dev=box.dataset.dev;
+  if(act==="setmax"){const n=parseInt($("max-"+d.key).value,10);if(!(n>=1&&n<=20)){toast("1〜20台で指定してください");return;}x.max=n;}
+  b.disabled=true;
+  try{await back().act(act,d,x);if(act==="del"&&openKey===d.key)openKey=null;toast(DONE[act]||"変更しました");}
+  catch(err){toast(err&&err.message==="not_admin"?"管理者の権限がありません":"変更できませんでした");b.disabled=false;}
 });
 $("issueBtn").onclick=async()=>{
-  const n=Math.min(20,Math.max(1,parseInt($("count").value,10)||1));
-  const memo=$("memo").value.trim().slice(0,60);
-  const maxDevices=Math.min(20,Math.max(1,parseInt($("maxDev").value,10)||3));
+  const x={count:Math.min(20,Math.max(1,parseInt($("count").value,10)||1)),memo:$("memo").value.trim().slice(0,60),max:Math.min(20,Math.max(1,parseInt($("maxDev").value,10)||3))};
   $("issueBtn").disabled=true;
-  try{
-    const batch=db.batch();
-    for(let i=0;i<n;i++)batch.set(db.collection("invites").doc(newCode()),{active:true,memo,maxDevices,devices:{},created:firebase.firestore.FieldValue.serverTimestamp()});
-    await batch.commit();$("memo").value="";toast(`${n}件発行しました`);
-  }catch(err){toast("発行できませんでした");}
+  try{await back().act("issue",null,x);$("memo").value="";toast(`${x.count}件発行しました`);}
+  catch(err){toast("発行できませんでした");}
   $("issueBtn").disabled=false;
 };
+
+$("loginBtn").onclick=()=>{
+  const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
+  auth.signInWithPopup(p).catch(e=>{
+    if(e&&(e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment"))auth.signInWithRedirect(p);
+    else if(!(e&&/popup-closed|cancelled-popup/.test(e.code)))$("msg").textContent="ログインできませんでした（"+(e&&e.code||"")+"）";
+  });
+};
+$("logoutBtn").onclick=()=>auth.signOut();
+auth.getRedirectResult().catch(()=>{});
+auth.onAuthStateChanged(u=>{
+  user=u;
+  $("loginBtn").hidden=!!u;$("logoutBtn").hidden=!u;$("who").textContent=u?(u.email||""):"";
+  switchTo(cur);
+});
+renderTabs();
+if(TEST_SYNC)switchTo(cur);
 })();
 </script>
 </body>
